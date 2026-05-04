@@ -170,11 +170,12 @@ class AiService {
   }) async* {
     try {
       if (_model == null) await loadModel();
+      final memory = _memorySummary(history, language);
       final chat = await _model!.createChat(
         temperature: .55,
         topK: 40,
         randomSeed: DateTime.now().millisecondsSinceEpoch % 100000,
-        systemInstruction: _systemInstruction(language),
+        systemInstruction: _systemInstruction(language, memory),
       );
       try {
         for (final item in _contextMessages(history, userMessage)) {
@@ -222,16 +223,43 @@ class AiService {
         .toList();
   }
 
-  String _systemInstruction(String language) => '''
-You are Sakhi, a warm and private menstrual health companion for Indian users.
+  String _systemInstruction(String language, String memory) => '''
+You are Sakhi, a private AI companion and gentle friend for girls and women in India.
+Your first job is companionship: respond warmly to greetings, casual chat, worries, boredom, school/college stress, family pressure, emotions, confidence, and daily life.
+Your second job is menstrual health support when the user asks for it.
+Do not refuse normal friendly conversation. If the user says hi, greet them like a caring friend and ask how their day is.
 Respond in the user's selected language: $language.
-Keep responses under 160 words.
-Never diagnose conditions. Use "cycle pattern concerns" for pattern questions.
-Suggest a doctor or ASHA worker for severe pain, heavy bleeding, infection signs, missed periods with pregnancy possibility, or anything worrying.
+Keep replies natural, short, and chat-like: usually 2 to 6 sentences.
+Use the user's local encrypted memory only when it helps. Never say you store cloud memory.
+Local memory from this device:
+$memory
+
+Health rules:
+Never diagnose. Use "cycle pattern concerns" for pattern questions.
+Suggest a doctor or ASHA worker for severe pain, heavy bleeding, infection signs, missed periods with pregnancy possibility, self-harm, or anything worrying.
 Use Indian food and daily-life examples when useful.
 Never ask for full name, phone, address, account, email, or exact location.
 Be gentle, practical, culturally sensitive, and non-alarmist.
 ''';
+
+  String _memorySummary(List<ChatMessage> history, String language) {
+    final recent = history
+        .where((item) => item.content.trim().isNotEmpty)
+        .toList()
+        .reversed
+        .take(10)
+        .toList()
+        .reversed;
+    if (recent.isEmpty) {
+      return 'No previous local memory yet. Start fresh and friendly.';
+    }
+    final lines = recent.map((item) {
+      final role = item.role == 'user' ? 'User' : 'Sakhi';
+      final text = item.content.replaceAll(RegExp(r'\s+'), ' ').trim();
+      return '$role: ${text.length > 180 ? '${text.substring(0, 180)}...' : text}';
+    }).join('\n');
+    return lines;
+  }
 
   String _cleanModelToken(String token) {
     return token
@@ -266,6 +294,9 @@ Be gentle, practical, culturally sensitive, and non-alarmist.
         sha1.convert(utf8.encode('$lower|${history.length}')).bytes.first % 3;
 
     if (language == 'hindi') {
+      if (_hasAny(lower, ['hi', 'hello', 'hey'])) {
+        return 'Sakhi yahan hai. Hi, kaise ho? Aaj bas chat karni hai ya kuch tension/period ke baare mein baat karni hai?';
+      }
       if (isPain) {
         return 'Sakhi yahan hai. Period pain mein warm water, lower abdomen par heat, aur gentle rest help kar sakte hain. Pain bahut severe ho ya unusual lage to doctor ya ASHA worker se baat karein.';
       }
@@ -278,6 +309,9 @@ Be gentle, practical, culturally sensitive, and non-alarmist.
     }
 
     if (language == 'manglish' || language == 'malayalam') {
+      if (_hasAny(lower, ['hi', 'hello', 'hey'])) {
+        return 'Sakhi ivide undu. Hi, innu engane undu? Just chat cheyyano, allenkil enthenkilum worry undo?';
+      }
       if (isPain) {
         return 'Sakhi ivide undu. Period pain aanenkil warm water, lower abdomen-il heat, rest okke try cheyyam. Severe/unusual aanel doctor/ASHA worker-ode samsarikkuka.';
       }
@@ -290,6 +324,7 @@ Be gentle, practical, culturally sensitive, and non-alarmist.
     }
 
     final options = [
+      'Hey, I am here. How are you feeling today? We can just chat, or you can tell me what is on your mind.',
       'Sakhi is here with you. Tell me one detail: pain, flow, mood, food, or cycle timing, and I will make the advice more specific.',
       'Sakhi is here with you. Cycle experiences can vary month to month. I can help you notice cycle pattern concerns and prepare gentle questions for a doctor or ASHA worker.',
       'Sakhi is here with you. Let us keep this practical: what changed today compared with your usual cycle day?',

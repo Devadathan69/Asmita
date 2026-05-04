@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../db/database_helper.dart';
 import '../db/models/chat_message.dart';
 import '../services/ai_service.dart';
 
+const sakhiMemorySessionId = 'sakhi_local_memory';
+
 final aiServiceProvider = Provider<AiService>((ref) => AiService());
 final companionSessionProvider = StateProvider<String>(
-  (ref) => const Uuid().v4(),
+  (ref) => sakhiMemorySessionId,
 );
 final chatProvider = AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(
   ChatNotifier.new,

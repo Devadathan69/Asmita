@@ -128,7 +128,7 @@ class _EmptySakhiState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Try: “What should I eat today?” or “My cramps are bad.”',
+              'Try: "What should I eat today?" or "My cramps are bad."',
               textAlign: TextAlign.center,
             ),
           ],

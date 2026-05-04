@@ -40,6 +40,8 @@ D:/Android/
 
 # Large local-only model/audio drops
 assets/models/*.bin
+assets/models/*.task
+assets/models/*.litertlm
 assets/audio/**/*.mpeg
 assets/audio/**/*.mp3
 
@@ -57,3 +59,4 @@ app.*.map.json
 # Local SDK path and build state
 android/local.properties
 android/.gradle/
+android/.kotlin/

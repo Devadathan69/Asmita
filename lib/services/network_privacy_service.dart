@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
 class NetworkPrivacyService {
@@ -25,6 +27,45 @@ class NetworkPrivacyService {
     if (response.statusCode < 200 || response.statusCode >= 300)
       throw NetworkPrivacyException('Request failed');
     return response.body;
+  }
+
+  Future<void> downloadFile(
+    String url,
+    File destination, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(url))
+        ..headers.addAll(const {'User-Agent': 'Mozilla/5.0'});
+      final response =
+          await client.send(request).timeout(const Duration(seconds: 30));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw const NetworkPrivacyException('Download failed');
+      }
+
+      await destination.parent.create(recursive: true);
+      final sink = destination.openWrite();
+      var received = 0;
+      final total = response.contentLength;
+      try {
+        await for (final chunk
+            in response.stream.timeout(const Duration(minutes: 12))) {
+          received += chunk.length;
+          sink.add(chunk);
+          if (total != null && total > 0) {
+            onProgress?.call((received / total).clamp(0, 1));
+          }
+        }
+      } finally {
+        await sink.close();
+      }
+      onProgress?.call(1);
+    } on TimeoutException {
+      throw const NetworkPrivacyException('Download timed out');
+    } finally {
+      client.close();
+    }
   }
 
   String _round(String value) {

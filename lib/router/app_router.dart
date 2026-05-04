@@ -4,6 +4,7 @@ import '../screens/asha/asha_coming_soon_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/companion/companion_screen.dart';
 import '../screens/entry/mode_selection_screen.dart';
+import '../screens/entry/startup_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/insights/insights_screen.dart';
 import '../screens/log/daily_log_screen.dart';
@@ -19,6 +20,10 @@ final appRouter = GoRouter(
   routes: [
     GoRoute(
       path: '/',
+      builder: (context, state) => const StartupScreen(),
+    ),
+    GoRoute(
+      path: '/mode',
       builder: (context, state) => const ModeSelectionScreen(),
     ),
     GoRoute(

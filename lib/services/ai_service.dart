@@ -16,18 +16,19 @@ class AiService {
   AiService({NetworkPrivacyService network = const NetworkPrivacyService()})
       : _network = network;
 
-  static const modelFileName = 'gemma3-270m-it-q8.task';
+  static const modelFileName =
+      'SmolLM-135M-Instruct_multi-prefill-seq_q8_ekv1280.task';
   static const bundledAsset = 'assets/models/$modelFileName';
   static const defaultModelUrl =
-      'https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/$modelFileName';
+      'https://huggingface.co/litert-community/SmolLM-135M-Instruct/resolve/main/$modelFileName';
   static const modelUrl = String.fromEnvironment(
-    'SAKHI_GEMMA_MODEL_URL',
+    'SAKHI_MODEL_URL',
     defaultValue: defaultModelUrl,
   );
   static const expectedSha256 = String.fromEnvironment(
-    'SAKHI_GEMMA_SHA256',
+    'SAKHI_MODEL_SHA256',
     defaultValue:
-        '0f7147f1c22eaf758b819bbf7841793e4c90096c9352cde7fbe5c631f2265ef5',
+        '6987dce5ac4f71032b070cf13412a5de0e49c04d271a053fc7d9d59a0dc104e9',
   );
 
   final NetworkPrivacyService _network;
@@ -85,7 +86,7 @@ class AiService {
         }
 
         if (await _assetExists(bundledAsset)) {
-          await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
+          await FlutterGemma.installModel(modelType: ModelType.general)
               .fromAsset(bundledAsset)
               .withProgress((progress) => controller.add(progress / 100))
               .install();
@@ -97,7 +98,7 @@ class AiService {
             onProgress: (progress) => controller.add(progress * .92),
           );
           await _verifyDownloadedModel(destination);
-          await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
+          await FlutterGemma.installModel(modelType: ModelType.general)
               .fromFile(destination.path)
               .withProgress((progress) {
             controller.add(.92 + ((progress / 100) * .08));
@@ -139,7 +140,7 @@ class AiService {
 
   Future<void> _activateInstalledOrDownloadedModel() async {
     if (await FlutterGemma.isModelInstalled(modelFileName)) {
-      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
+      await FlutterGemma.installModel(modelType: ModelType.general)
           .fromNetwork(modelUrl)
           .install();
       return;
@@ -148,14 +149,14 @@ class AiService {
     final file = await _downloadedModelFile();
     if (file.existsSync() && file.lengthSync() > 0) {
       await _verifyDownloadedModel(file);
-      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
+      await FlutterGemma.installModel(modelType: ModelType.general)
           .fromFile(file.path)
           .install();
       return;
     }
 
     if (await _assetExists(bundledAsset)) {
-      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
+      await FlutterGemma.installModel(modelType: ModelType.general)
           .fromAsset(bundledAsset)
           .install();
       return;

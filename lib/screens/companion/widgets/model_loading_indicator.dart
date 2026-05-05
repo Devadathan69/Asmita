@@ -56,7 +56,7 @@ class _ModelLoadingIndicatorState extends State<ModelLoadingIndicator> {
                   Text(
                     success
                         ? 'Model loaded successfully. Sakhi will now run privately on this device.'
-                        : 'Downloads the real on-device Gemma model once. After setup, Sakhi works offline for chat.',
+                        : 'Downloads Sakhi\'s on-device chat model once. After setup, Sakhi works offline for chat.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 26),

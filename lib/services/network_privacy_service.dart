@@ -24,8 +24,12 @@ class NetworkPrivacyService {
     final response = await http.get(uri, headers: const {
       'User-Agent': 'Mozilla/5.0'
     }).timeout(const Duration(seconds: 12));
-    if (response.statusCode < 200 || response.statusCode >= 300)
-      throw NetworkPrivacyException('Request failed');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw NetworkPrivacyException(
+        'Request failed',
+        statusCode: response.statusCode,
+      );
+    }
     return response.body;
   }
 
@@ -41,7 +45,13 @@ class NetworkPrivacyService {
       final response =
           await client.send(request).timeout(const Duration(seconds: 30));
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw const NetworkPrivacyException('Download failed');
+        final message = response.statusCode == 401 || response.statusCode == 403
+            ? 'Model download is not public. Please use a public model URL or place the model file in assets/models.'
+            : 'Download failed';
+        throw NetworkPrivacyException(
+          message,
+          statusCode: response.statusCode,
+        );
       }
 
       await destination.parent.create(recursive: true);
@@ -76,6 +86,11 @@ class NetworkPrivacyService {
 }
 
 class NetworkPrivacyException implements Exception {
-  const NetworkPrivacyException(this.message);
+  const NetworkPrivacyException(this.message, {this.statusCode});
   final String message;
+  final int? statusCode;
+
+  @override
+  String toString() =>
+      statusCode == null ? message : '$message (HTTP $statusCode)';
 }

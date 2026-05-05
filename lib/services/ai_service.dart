@@ -16,17 +16,18 @@ class AiService {
   AiService({NetworkPrivacyService network = const NetworkPrivacyService()})
       : _network = network;
 
-  static const modelFileName = 'functiongemma-flutter_q8_ekv1024.task';
+  static const modelFileName = 'gemma3-270m-it-q8.task';
   static const bundledAsset = 'assets/models/$modelFileName';
   static const defaultModelUrl =
-      'https://huggingface.co/lukauux/functiongemma-flutter-task/resolve/main/$modelFileName';
+      'https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/$modelFileName';
   static const modelUrl = String.fromEnvironment(
     'SAKHI_GEMMA_MODEL_URL',
     defaultValue: defaultModelUrl,
   );
   static const expectedSha256 = String.fromEnvironment(
     'SAKHI_GEMMA_SHA256',
-    defaultValue: '',
+    defaultValue:
+        '0f7147f1c22eaf758b819bbf7841793e4c90096c9352cde7fbe5c631f2265ef5',
   );
 
   final NetworkPrivacyService _network;
@@ -84,7 +85,7 @@ class AiService {
         }
 
         if (await _assetExists(bundledAsset)) {
-          await FlutterGemma.installModel(modelType: ModelType.functionGemma)
+          await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
               .fromAsset(bundledAsset)
               .withProgress((progress) => controller.add(progress / 100))
               .install();
@@ -96,7 +97,7 @@ class AiService {
             onProgress: (progress) => controller.add(progress * .92),
           );
           await _verifyDownloadedModel(destination);
-          await FlutterGemma.installModel(modelType: ModelType.functionGemma)
+          await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
               .fromFile(destination.path)
               .withProgress((progress) {
             controller.add(.92 + ((progress / 100) * .08));
@@ -138,7 +139,7 @@ class AiService {
 
   Future<void> _activateInstalledOrDownloadedModel() async {
     if (await FlutterGemma.isModelInstalled(modelFileName)) {
-      await FlutterGemma.installModel(modelType: ModelType.functionGemma)
+      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
           .fromNetwork(modelUrl)
           .install();
       return;
@@ -147,14 +148,14 @@ class AiService {
     final file = await _downloadedModelFile();
     if (file.existsSync() && file.lengthSync() > 0) {
       await _verifyDownloadedModel(file);
-      await FlutterGemma.installModel(modelType: ModelType.functionGemma)
+      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
           .fromFile(file.path)
           .install();
       return;
     }
 
     if (await _assetExists(bundledAsset)) {
-      await FlutterGemma.installModel(modelType: ModelType.functionGemma)
+      await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
           .fromAsset(bundledAsset)
           .install();
       return;
@@ -177,6 +178,7 @@ class AiService {
         randomSeed: DateTime.now().millisecondsSinceEpoch % 100000,
         systemInstruction: _systemInstruction(language, memory),
       );
+      final buffer = StringBuffer();
       try {
         for (final item in _contextMessages(history, userMessage)) {
           await chat.addQueryChunk(
@@ -192,12 +194,19 @@ class AiService {
             if (cleaned.isEmpty) continue;
             emittedWords += cleaned.split(RegExp(r'\s+')).length;
             if (emittedWords > 320) break;
-            yield cleaned;
+            buffer.write(cleaned);
           }
         }
       } finally {
         await chat.close();
       }
+      final repaired = _repairResponse(
+        userMessage: userMessage,
+        modelText: buffer.toString(),
+        history: history,
+        language: language,
+      );
+      yield* _streamText(repaired);
     } catch (_) {
       _engine = SakhiEngine.localFallback;
       yield* _streamFallback(userMessage, history, language);
@@ -225,9 +234,11 @@ class AiService {
 
   String _systemInstruction(String language, String memory) => '''
 You are Sakhi, a private AI companion and gentle friend for girls and women in India.
-Your first job is companionship: respond warmly to greetings, casual chat, worries, boredom, school/college stress, family pressure, emotions, confidence, and daily life.
+Your first job is companionship: respond warmly to greetings, casual chat, worries, boredom, school/college stress, family pressure, emotions, confidence, dreams, friendships, and daily life.
 Your second job is menstrual health support when the user asks for it.
 Do not refuse normal friendly conversation. If the user says hi, greet them like a caring friend and ask how their day is.
+You know your name is Sakhi. Speak as Sakhi in first person. Do not say you are only a language assistant.
+If the user tells you a personal preference, worry, name, class, college, cycle detail, mood pattern, or life detail, gently remember it using the local memory below.
 Respond in the user's selected language: $language.
 Keep replies natural, short, and chat-like: usually 2 to 6 sentences.
 Use the user's local encrypted memory only when it helps. Never say you store cloud memory.
@@ -258,7 +269,65 @@ Be gentle, practical, culturally sensitive, and non-alarmist.
       final text = item.content.replaceAll(RegExp(r'\s+'), ' ').trim();
       return '$role: ${text.length > 180 ? '${text.substring(0, 180)}...' : text}';
     }).join('\n');
-    return lines;
+    final userFacts = _extractMemoryFacts(history);
+    if (userFacts.isEmpty) return lines;
+    return 'Remembered user details:\n${userFacts.join('\n')}\n\nRecent conversation:\n$lines';
+  }
+
+  List<String> _extractMemoryFacts(List<ChatMessage> history) {
+    final facts = <String>[];
+    for (final item in history.where((message) => message.role == 'user')) {
+      final text = item.content.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final lower = text.toLowerCase();
+      if (_hasAny(lower, ['my name is', 'call me', 'i am ', 'i\'m '])) {
+        facts.add('- User identity/preference: $text');
+      } else if (_hasAny(lower, ['i like', 'i love', 'i hate', 'favorite'])) {
+        facts.add('- User preference: $text');
+      } else if (_hasAny(lower, ['school', 'college', 'exam', 'class'])) {
+        facts.add('- User study context: $text');
+      } else if (_hasAny(lower, ['period', 'cycle', 'cramp', 'pain', 'flow'])) {
+        facts.add('- User cycle/health context: $text');
+      } else if (_hasAny(
+          lower, ['sad', 'happy', 'angry', 'stress', 'anxious'])) {
+        facts.add('- User emotional context: $text');
+      }
+      if (facts.length >= 8) break;
+    }
+    return facts;
+  }
+
+  String _repairResponse({
+    required String userMessage,
+    required String modelText,
+    required List<ChatMessage> history,
+    required String language,
+  }) {
+    final cleaned = modelText
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(
+            RegExp(r'^(Sakhi|Assistant|Model)\s*:\s*', caseSensitive: false),
+            '')
+        .trim();
+    if (_isBadModelResponse(userMessage, cleaned)) {
+      return _localCompanionResponse(userMessage, history, language);
+    }
+    return cleaned;
+  }
+
+  bool _isBadModelResponse(String userMessage, String response) {
+    if (response.trim().isEmpty) return true;
+    final lower = response.toLowerCase();
+    final user = userMessage.toLowerCase().trim();
+    if (lower == user) return true;
+    if (lower.length <= user.length + 8 && lower.contains(user)) return true;
+    return _hasAny(lower, [
+      'i cannot fulfill',
+      'i can not fulfill',
+      'capabilities are limited',
+      'limited to assisting with use of language',
+      'i am unable to',
+      'as a language model',
+    ]);
   }
 
   String _cleanModelToken(String token) {
@@ -275,6 +344,10 @@ Be gentle, practical, culturally sensitive, and non-alarmist.
     String language,
   ) async* {
     final response = _localCompanionResponse(message, history, language);
+    yield* _streamText(response);
+  }
+
+  Stream<String> _streamText(String response) async* {
     for (final word in response.split(' ')) {
       await Future<void>.delayed(const Duration(milliseconds: 18));
       yield '$word ';

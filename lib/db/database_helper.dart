@@ -20,7 +20,7 @@ class DatabaseHelper {
     final path = p.join(await getDatabasesPath(), 'asmita.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE user_profile(id INTEGER PRIMARY KEY, name_enc TEXT, date_of_birth TEXT, avg_cycle_length INTEGER DEFAULT 28, period_duration INTEGER DEFAULT 5, is_irregular INTEGER DEFAULT 0, life_stage TEXT DEFAULT "menstruating", suspects_pcos TEXT DEFAULT "not_sure", language TEXT DEFAULT "english", discreet_mode INTEGER DEFAULT 0, created_at TEXT)',
@@ -40,9 +40,39 @@ class DatabaseHelper {
         await db.execute(
           'CREATE TABLE app_settings(key TEXT PRIMARY KEY, value_enc TEXT)',
         );
+        await _createScreeningRecords(db);
         await _seedSymptoms(db);
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createScreeningRecords(db);
+        }
+      },
     );
+  }
+
+  Future<void> _createScreeningRecords(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS screening_records (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        girl_id         TEXT NOT NULL UNIQUE,
+        risk_score      INTEGER,
+        risk_tier       TEXT,
+        color           TEXT,
+        bmi             REAL,
+        an_neck_score   REAL,
+        an_knuckle      INTEGER,
+        periorbital     INTEGER,
+        hirsutism       INTEGER,
+        acne_jawline    INTEGER,
+        menstrual_score INTEGER,
+        menstrual_text_enc TEXT,
+        breakdown_json  TEXT,
+        screened_at     TEXT,
+        village_enc     TEXT,
+        district_enc    TEXT
+      )
+    ''');
   }
 
   Future<void> _seedSymptoms(Database db) async {

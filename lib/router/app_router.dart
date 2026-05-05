@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../screens/asha/asha_coming_soon_screen.dart';
+import '../screens/asha/asha_camera_screen.dart';
+import '../screens/asha/asha_history_screen.dart';
+import '../screens/asha/asha_home_screen.dart';
+import '../screens/asha/asha_instructions_screen.dart';
+import '../screens/asha/asha_measurements_screen.dart';
+import '../screens/asha/asha_menstrual_screen.dart';
+import '../screens/asha/asha_processing_screen.dart';
+import '../screens/asha/asha_result_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/companion/companion_screen.dart';
 import '../screens/entry/mode_selection_screen.dart';
@@ -33,7 +40,41 @@ final appRouter = GoRouter(
     GoRoute(path: '/setup', builder: (context, state) => const SetupScreen()),
     GoRoute(
       path: '/asha-coming-soon',
-      builder: (context, state) => const AshaComingSoonScreen(),
+      redirect: (context, state) => '/asha/home',
+    ),
+    GoRoute(
+      path: '/asha/home',
+      builder: (context, state) => const AshaHomeScreen(),
+    ),
+    GoRoute(
+      path: '/asha/instructions',
+      builder: (context, state) => const AshaInstructionsScreen(),
+    ),
+    GoRoute(
+      path: '/asha/camera/:step',
+      builder: (context, state) => AshaCameraScreen(
+        step: state.pathParameters['step'] ?? 'neck',
+      ),
+    ),
+    GoRoute(
+      path: '/asha/measurements',
+      builder: (context, state) => const AshaMeasurementsScreen(),
+    ),
+    GoRoute(
+      path: '/asha/menstrual',
+      builder: (context, state) => const AshaMenstrualScreen(),
+    ),
+    GoRoute(
+      path: '/asha/processing',
+      builder: (context, state) => const AshaProcessingScreen(),
+    ),
+    GoRoute(
+      path: '/asha/result',
+      builder: (context, state) => const AshaResultScreen(),
+    ),
+    GoRoute(
+      path: '/asha/history',
+      builder: (context, state) => const AshaHistoryScreen(),
     ),
     GoRoute(path: '/music', builder: (context, state) => const MusicScreen()),
     GoRoute(

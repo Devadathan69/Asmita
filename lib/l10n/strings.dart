@@ -39,10 +39,10 @@ class Strings {
       AppLanguage.manglish: 'ASHA Worker',
     },
     'asha_worker_subtitle': {
-      AppLanguage.english: 'Community screening tools are coming soon.',
-      AppLanguage.malayalam: 'Community screening tools ഉടൻ വരുന്നു.',
-      AppLanguage.hindi: 'Community screening tools जल्द आ रहे हैं.',
-      AppLanguage.manglish: 'Community screening tools udane varum.',
+      AppLanguage.english: 'Community screening tools for ASHA workers.',
+      AppLanguage.malayalam: 'ASHA workers-inu community screening tools.',
+      AppLanguage.hindi: 'ASHA workers ke liye community screening tools.',
+      AppLanguage.manglish: 'ASHA workers-inu screening tools.',
     },
     'select_language': {
       AppLanguage.english: 'SELECT LANGUAGE',
@@ -51,10 +51,10 @@ class Strings {
       AppLanguage.manglish: 'Bhasha select cheyyu',
     },
     'coming_soon': {
-      AppLanguage.english: 'Coming Soon',
-      AppLanguage.malayalam: 'ഉടൻ വരുന്നു',
-      AppLanguage.hindi: 'जल्द आ रहा है',
-      AppLanguage.manglish: 'Udane varum',
+      AppLanguage.english: 'Available Now',
+      AppLanguage.malayalam: 'Available now',
+      AppLanguage.hindi: 'Available now',
+      AppLanguage.manglish: 'Available now',
     },
     'period_start': {
       AppLanguage.english: 'Period started',

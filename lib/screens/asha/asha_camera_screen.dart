@@ -32,6 +32,14 @@ class _AshaCameraScreenState extends ConsumerState<AshaCameraScreen> {
     _setup();
   }
 
+  @override
+  void didUpdateWidget(covariant AshaCameraScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.step != widget.step) {
+      setState(() => capturedPath = null);
+    }
+  }
+
   Future<void> _setup() async {
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
@@ -95,7 +103,7 @@ class _AshaCameraScreenState extends ConsumerState<AshaCameraScreen> {
                             ),
                             const SizedBox(width: 10),
                             Text(
-                              '${_stepNumber(step)} of 3 — ${_title(step)}',
+                              '${_stepNumber(step)} of 3 - ${_title(step)}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w900,
@@ -121,11 +129,7 @@ class _AshaCameraScreenState extends ConsumerState<AshaCameraScreen> {
                               ? Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      _hint(step),
-                                      style:
-                                          const TextStyle(color: Colors.white),
-                                    ),
+                                    _StepHint(step: step),
                                     const SizedBox(height: 14),
                                     GestureDetector(
                                       onTap: _capture,
@@ -211,12 +215,6 @@ class _AshaCameraScreenState extends ConsumerState<AshaCameraScreen> {
         'knuckle' => 'Knuckle Photo',
         _ => 'Face Photo',
       };
-
-  String _hint(String step) => switch (step) {
-        'neck' => 'Remove necklace and align back of neck clearly.',
-        'knuckle' => 'Keep fingers relaxed and knuckles inside the frame.',
-        _ => 'Keep face centered with natural daylight.',
-      };
 }
 
 class _ErrorState extends StatelessWidget {
@@ -240,6 +238,41 @@ class _ErrorState extends StatelessWidget {
             AsmitaButton(label: 'Go Back', onPressed: onBack),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StepHint extends StatelessWidget {
+  const _StepHint({required this.step});
+  final String step;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (step) {
+      'neck' => Icons.accessibility_new_rounded,
+      'knuckle' => Icons.back_hand_rounded,
+      _ => Icons.face_rounded,
+    };
+    final text = switch (step) {
+      'neck' => 'Remove necklace. Keep the neck centered.',
+      'knuckle' => 'Relax fingers. Keep knuckles inside the frame.',
+      _ => 'Use daylight. Keep the face centered.',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

@@ -53,7 +53,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
                     child: AsmitaScreenHeader(
                       title: 'Sakhi',
-                      subtitle: 'Private companion • No data sent',
+                      subtitle: 'Private companion - No data sent',
                       trailing: IconButton.filledTonal(
                         onPressed: () =>
                             ref.read(chatProvider.notifier).clear(),
@@ -122,13 +122,13 @@ class _EmptySakhiState extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Ask Sakhi anything gently',
+              'Talk to Sakhi like a friend',
               style: Theme.of(context).textTheme.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             const Text(
-              'Try: "What should I eat today?" or "My cramps are bad."',
+              'Try: "hi", "I had a bad day", or "remember I like music."',
               textAlign: TextAlign.center,
             ),
           ],

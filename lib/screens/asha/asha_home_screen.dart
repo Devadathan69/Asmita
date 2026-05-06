@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -40,7 +41,7 @@ class AshaHomeScreen extends ConsumerWidget {
                                 style:
                                     Theme.of(context).textTheme.headlineSmall),
                             const Text(
-                                'Project Asmita — Adolescent Health Screening'),
+                                'Project Asmita - Adolescent Health Screening'),
                           ],
                         ),
                       ),
@@ -55,34 +56,54 @@ class AshaHomeScreen extends ConsumerWidget {
                       ),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        const Text(
-                          'Ready to screen',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(.18),
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          DateFormat('EEEE, dd MMM yyyy')
-                              .format(DateTime.now()),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '$count screenings saved',
-                          style: const TextStyle(
+                          child: const Icon(
+                            Icons.health_and_safety_rounded,
                             color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                            size: 30,
+                          ),
+                        ).animate().scale(duration: 420.ms),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ready to screen',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                DateFormat('dd MMM yyyy')
+                                    .format(DateTime.now()),
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '$count screenings saved',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
+                  ).animate().fadeIn(duration: 360.ms).slideY(begin: .04),
                   const SizedBox(height: 20),
                   AsmitaButton(
                     label: 'Start New Screening',

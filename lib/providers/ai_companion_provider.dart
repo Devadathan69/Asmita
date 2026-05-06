@@ -28,10 +28,19 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
     );
     await DatabaseHelper.instance.insertChat(user);
     state = AsyncData([...state.value ?? [], user]);
+    final thinking = ChatMessage(
+      content: 'Sakhi is thinking...',
+      role: 'assistant',
+      timestamp: DateTime.now(),
+      sessionId: session,
+    );
+    state = AsyncData([...state.value ?? [], thinking]);
     var answer = '';
     await for (final token in ref.read(aiServiceProvider).generateResponse(
           text,
-          state.value ?? const [],
+          (state.value ?? const [])
+              .where((message) => message.content != thinking.content)
+              .toList(),
           language: language,
         )) {
       answer += token;
@@ -43,7 +52,10 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
       sessionId: session,
     );
     await DatabaseHelper.instance.insertChat(assistant);
-    state = AsyncData([...state.value ?? [], assistant]);
+    final visible = (state.value ?? const [])
+        .where((message) => message.content != thinking.content)
+        .toList();
+    state = AsyncData([...visible, assistant]);
   }
 
   Future<void> clear() async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,7 +37,10 @@ class _AshaInstructionsScreenState
                   onPageChanged: (value) => setState(() => index = value),
                   itemBuilder: (_, i) => Padding(
                     padding: const EdgeInsets.all(20),
-                    child: pages[i],
+                    child: pages[i]
+                        .animate(key: ValueKey(i))
+                        .fadeIn(duration: 260.ms)
+                        .slideX(begin: .04),
                   ),
                 ),
               ),
@@ -85,19 +89,19 @@ class _AshaInstructionsScreenState
   List<Widget> get _pages => const [
         PhaseInstructionCard(
           icon: Icons.camera_alt,
-          title: 'Step 1 — Back of Neck Photo',
+          title: 'Step 1 - Back of Neck Photo',
           color: AppColors.accent,
           instructions: [
             'Ask the girl to sit facing away from you',
             'Pull hair up or tie it back',
             'Remove any necklace',
-            'Hold phone 20–30cm from neck',
+            'Hold phone 20-30cm from neck',
             'Use natural daylight and avoid flash',
           ],
         ),
         PhaseInstructionCard(
           icon: Icons.back_hand,
-          title: 'Step 2 — Knuckle Photo',
+          title: 'Step 2 - Knuckle Photo',
           color: AppColors.primaryLight,
           instructions: [
             'Ask the girl to make a loose fist',
@@ -108,7 +112,7 @@ class _AshaInstructionsScreenState
         ),
         PhaseInstructionCard(
           icon: Icons.face_rounded,
-          title: 'Step 3 — Face Photo',
+          title: 'Step 3 - Face Photo',
           color: AppColors.secondary,
           instructions: [
             'Full face should be visible',
@@ -119,7 +123,7 @@ class _AshaInstructionsScreenState
         ),
         PhaseInstructionCard(
           icon: Icons.monitor_weight_outlined,
-          title: 'Step 4 — Height & Weight',
+          title: 'Step 4 - Height & Weight',
           color: AppColors.success,
           instructions: [
             'Measure height with measuring tape',
@@ -129,7 +133,7 @@ class _AshaInstructionsScreenState
         ),
         PhaseInstructionCard(
           icon: Icons.question_answer_rounded,
-          title: 'Step 5 — Cycle Questions',
+          title: 'Step 5 - Cycle Questions',
           color: AppColors.luteal,
           instructions: [
             'Ask three simple questions',

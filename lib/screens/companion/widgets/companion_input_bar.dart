@@ -5,9 +5,11 @@ class CompanionInputBar extends StatefulWidget {
     super.key,
     required this.onSend,
     required this.onMic,
+    this.enabled = true,
   });
   final ValueChanged<String> onSend;
   final VoidCallback onMic;
+  final bool enabled;
   @override
   State<CompanionInputBar> createState() => _CompanionInputBarState();
 }
@@ -21,10 +23,12 @@ class _CompanionInputBarState extends State<CompanionInputBar> {
           child: Row(
             children: [
               IconButton(
-                  onPressed: widget.onMic, icon: const Icon(Icons.mic_none)),
+                  onPressed: widget.enabled ? widget.onMic : null,
+                  icon: const Icon(Icons.mic_none)),
               Expanded(
                 child: TextField(
                   controller: controller,
+                  enabled: widget.enabled,
                   maxLength: 500,
                   decoration: const InputDecoration(
                     hintText: 'Ask Sakhi privately',
@@ -32,13 +36,15 @@ class _CompanionInputBarState extends State<CompanionInputBar> {
                 ),
               ),
               IconButton(
-                onPressed: () {
-                  final text = controller.text.trim();
-                  if (text.isNotEmpty) {
-                    widget.onSend(text);
-                    controller.clear();
-                  }
-                },
+                onPressed: widget.enabled
+                    ? () {
+                        final text = controller.text.trim();
+                        if (text.isNotEmpty) {
+                          widget.onSend(text);
+                          controller.clear();
+                        }
+                      }
+                    : null,
                 icon: const Icon(Icons.send),
               ),
             ],

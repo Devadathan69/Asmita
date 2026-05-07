@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/strings.dart';
@@ -22,13 +23,41 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
   int refresh = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showMemoryNote());
+  }
+
+  Future<void> _showMemoryNote() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('sakhi_memory_note_seen') == true || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sakhi memory stays here'),
+        content: const Text(
+          'Sakhi can remember small things you choose to share, like your language preference or what helps you feel better. This memory stays only on this phone. You can delete it anytime.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+    await prefs.setBool('sakhi_memory_note_seen', true);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final chat = ref.watch(chatProvider);
     final ai = ref.watch(aiServiceProvider);
     final language = ref.watch(languageProvider).value ?? AppLanguage.english;
+    final isGenerating = ref.watch(sakhiGeneratingProvider);
     return FutureBuilder<bool>(
       key: ValueKey(refresh),
-      future: ai.isModelAvailable(),
+      future: ai.isModelDownloaded(),
       builder: (context, model) {
         if (model.connectionState != ConnectionState.done) {
           return const Scaffold(
@@ -54,10 +83,24 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                     child: AsmitaScreenHeader(
                       title: 'Sakhi',
                       subtitle: 'Private companion - No data sent',
-                      trailing: IconButton.filledTonal(
-                        onPressed: () =>
-                            ref.read(chatProvider.notifier).clear(),
-                        icon: const Icon(Icons.delete_outline_rounded),
+                      trailing: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded),
+                        onSelected: (value) {
+                          if (value == 'memory') _showMemorySheet();
+                          if (value == 'clear_chat') {
+                            ref.read(chatProvider.notifier).clear();
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'memory',
+                            child: Text('Memory'),
+                          ),
+                          PopupMenuItem(
+                            value: 'clear_chat',
+                            child: Text('Clear chat history'),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -84,6 +127,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                     ),
                   ),
                   CompanionInputBar(
+                    enabled: !isGenerating,
                     onSend: (text) {
                       if (text.length <= 500) {
                         ref.read(chatProvider.notifier).send(
@@ -100,6 +144,74 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showMemorySheet() async {
+    final service = ref.read(aiServiceProvider).memoryService;
+    final memories = await service.getAllMemories();
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return FutureBuilder(
+                future: service.getAllMemories(),
+                initialData: memories,
+                builder: (context, snapshot) {
+                  final items = snapshot.data ?? const [];
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Sakhi Memory',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'Saved only on this phone. You can delete it anytime.'),
+                      const SizedBox(height: 12),
+                      if (items.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Text('No saved memories yet.'),
+                        )
+                      else
+                        Flexible(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: items.length,
+                            itemBuilder: (_, i) => ListTile(
+                              title: Text(items[i].value),
+                              subtitle: Text(items[i].category),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () async {
+                                  await service.deleteMemory(items[i].key);
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      TextButton(
+                        onPressed: () async {
+                          await service.clearAllMemories();
+                          setModalState(() {});
+                        },
+                        child: const Text('Clear all memories'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

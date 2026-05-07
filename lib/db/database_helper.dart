@@ -20,7 +20,7 @@ class DatabaseHelper {
     final path = p.join(await getDatabasesPath(), 'asmita.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE user_profile(id INTEGER PRIMARY KEY, name_enc TEXT, date_of_birth TEXT, avg_cycle_length INTEGER DEFAULT 28, period_duration INTEGER DEFAULT 5, is_irregular INTEGER DEFAULT 0, life_stage TEXT DEFAULT "menstruating", suspects_pcos TEXT DEFAULT "not_sure", language TEXT DEFAULT "english", discreet_mode INTEGER DEFAULT 0, created_at TEXT)',
@@ -41,11 +41,15 @@ class DatabaseHelper {
           'CREATE TABLE app_settings(key TEXT PRIMARY KEY, value_enc TEXT)',
         );
         await _createScreeningRecords(db);
+        await _createSakhiTables(db);
         await _seedSymptoms(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createScreeningRecords(db);
+        }
+        if (oldVersion < 3) {
+          await _createSakhiTables(db);
         }
       },
     );
@@ -73,6 +77,32 @@ class DatabaseHelper {
         district_enc    TEXT
       )
     ''');
+  }
+
+  Future<void> _createSakhiTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sakhi_memories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_key TEXT NOT NULL,
+        memory_value_enc TEXT NOT NULL,
+        category TEXT NOT NULL,
+        confidence REAL DEFAULT 1.0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sakhi_chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        content_enc TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> ensureSakhiTables() async {
+    await _createSakhiTables(await database);
   }
 
   Future<void> _seedSymptoms(Database db) async {

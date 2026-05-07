@@ -13,7 +13,8 @@ class ModelLoadingIndicator extends StatefulWidget {
     required this.onComplete,
   });
 
-  final Stream<double> Function() onDownload;
+  final Future<void> Function(
+      {required void Function(double progress) onProgress}) onDownload;
   final VoidCallback onComplete;
 
   @override
@@ -46,9 +47,7 @@ class _ModelLoadingIndicatorState extends State<ModelLoadingIndicator> {
                   ),
                   const SizedBox(height: 22),
                   Text(
-                    success
-                        ? 'Sakhi is ready'
-                        : 'Setting up Sakhi for the first time',
+                    success ? 'Sakhi is ready' : 'Download Sakhi AI',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -56,7 +55,7 @@ class _ModelLoadingIndicatorState extends State<ModelLoadingIndicator> {
                   Text(
                     success
                         ? 'Model loaded successfully. Sakhi will now run privately on this device.'
-                        : 'Downloads Sakhi\'s on-device chat model once. After setup, Sakhi works offline for chat.',
+                        : 'Sakhi works offline after a one-time model download. Your chats stay on this phone.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 26),
@@ -92,7 +91,9 @@ class _ModelLoadingIndicatorState extends State<ModelLoadingIndicator> {
                     )
                   else
                     AsmitaButton(
-                      label: downloading ? 'Setting up...' : 'Set up Sakhi',
+                      label: downloading
+                          ? 'Downloading...'
+                          : 'Download Offline AI',
                       icon: Icons.auto_awesome_rounded,
                       onPressed: downloading ? null : _download,
                     ),
@@ -110,10 +111,12 @@ class _ModelLoadingIndicatorState extends State<ModelLoadingIndicator> {
       progress = 0;
     });
     try {
-      await for (final value in widget.onDownload()) {
-        if (!mounted) return;
-        setState(() => progress = value);
-      }
+      await widget.onDownload(
+        onProgress: (value) {
+          if (!mounted) return;
+          setState(() => progress = value);
+        },
+      );
       if (!mounted) return;
       setState(() {
         progress = 1;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +23,8 @@ class CompanionScreen extends ConsumerStatefulWidget {
 
 class _CompanionScreenState extends ConsumerState<CompanionScreen> {
   int refresh = 0;
+  Timer? _stuckTimer;
+  bool _showStuckRecovery = false;
 
   @override
   void initState() {
@@ -50,14 +54,23 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
   }
 
   @override
+  void dispose() {
+    _stuckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final chat = ref.watch(chatProvider);
     final ai = ref.watch(aiServiceProvider);
     final language = ref.watch(languageProvider).value ?? AppLanguage.english;
     final isGenerating = ref.watch(sakhiGeneratingProvider);
+    _syncStuckRecovery(isGenerating);
     return FutureBuilder<bool>(
       key: ValueKey(refresh),
-      future: ai.isModelDownloaded(),
+      future: ai
+          .isModelDownloaded()
+          .timeout(const Duration(seconds: 3), onTimeout: () => false),
       builder: (context, model) {
         if (model.connectionState != ConnectionState.done) {
           return const Scaffold(
@@ -68,6 +81,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
           return ModelLoadingIndicator(
             onDownload: ai.downloadModel,
             onComplete: () {
+              if (!mounted) return;
               setState(() => refresh++);
               ref.invalidate(chatProvider);
             },
@@ -138,6 +152,40 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                     },
                     onMic: () => HapticFeedback.selectionClick(),
                   ),
+                  if (_showStuckRecovery && isGenerating)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surface
+                              .withValues(alpha: .92),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            children: [
+                              const Expanded(child: Text('Sakhi seems stuck.')),
+                              TextButton(
+                                onPressed: () {
+                                  _stuckTimer?.cancel();
+                                  setState(() => _showStuckRecovery = false);
+                                  ref
+                                      .read(chatProvider.notifier)
+                                      .stopCurrentResponse();
+                                },
+                                child: const Text('Stop'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -147,9 +195,28 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
     );
   }
 
+  void _syncStuckRecovery(bool isGenerating) {
+    if (!isGenerating) {
+      _stuckTimer?.cancel();
+      _stuckTimer = null;
+      if (_showStuckRecovery) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _showStuckRecovery = false);
+        });
+      }
+      return;
+    }
+    _stuckTimer ??= Timer(const Duration(seconds: 40), () {
+      if (!mounted || !ref.read(sakhiGeneratingProvider)) return;
+      setState(() => _showStuckRecovery = true);
+    });
+  }
+
   Future<void> _showMemorySheet() async {
     final service = ref.read(aiServiceProvider).memoryService;
-    final memories = await service.getAllMemories();
+    final memories = await service
+        .getAllMemories()
+        .timeout(const Duration(seconds: 3), onTimeout: () => const []);
     if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
@@ -160,7 +227,10 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
           child: StatefulBuilder(
             builder: (context, setModalState) {
               return FutureBuilder(
-                future: service.getAllMemories(),
+                future: service.getAllMemories().timeout(
+                      const Duration(seconds: 3),
+                      onTimeout: () => const [],
+                    ),
                 initialData: memories,
                 builder: (context, snapshot) {
                   final items = snapshot.data ?? const [];
@@ -190,7 +260,10 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete_outline),
                                 onPressed: () async {
-                                  await service.deleteMemory(items[i].key);
+                                  await service
+                                      .deleteMemory(items[i].key)
+                                      .timeout(const Duration(seconds: 3));
+                                  if (!context.mounted) return;
                                   setModalState(() {});
                                 },
                               ),
@@ -199,7 +272,10 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                         ),
                       TextButton(
                         onPressed: () async {
-                          await service.clearAllMemories();
+                          await service
+                              .clearAllMemories()
+                              .timeout(const Duration(seconds: 3));
+                          if (!context.mounted) return;
                           setModalState(() {});
                         },
                         child: const Text('Clear all memories'),

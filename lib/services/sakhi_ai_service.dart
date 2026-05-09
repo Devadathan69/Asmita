@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'network_privacy_service.dart';
 import 'sakhi_memory_service.dart';
 
+const bool kUseSakhiMockModel = false;
+
 class SakhiAiService {
   SakhiAiService({
     NetworkPrivacyService network = const NetworkPrivacyService(),
@@ -33,6 +35,8 @@ class SakhiAiService {
   final SakhiMemoryService _memory;
   InferenceModel? _model;
   bool _initialized = false;
+  bool _isLoaded = false;
+  Future<void>? _loadingFuture;
   double _downloadProgress = 0;
 
   SakhiMemoryService get memoryService => _memory;
@@ -40,6 +44,17 @@ class SakhiAiService {
   Future<File> _modelFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/models/sakhi_model.task');
+  }
+
+  Future<void> logModelStatus() async {
+    final file = await _modelFile();
+    final exists = file.existsSync();
+    final sizeMb =
+        exists ? (file.lengthSync() / (1024 * 1024)).toStringAsFixed(2) : '0';
+    _log('model expected path: ${file.path}');
+    _log('model exists: $exists');
+    _log('model size MB: $sizeMb');
+    _log('model download complete: ${exists && file.lengthSync() > 0}');
   }
 
   Future<void> _initGemma() async {
@@ -51,7 +66,15 @@ class SakhiAiService {
 
   Future<bool> isModelDownloaded() async {
     final file = await _modelFile();
-    return file.existsSync() && file.lengthSync() > 0;
+    final exists = file.existsSync();
+    final complete = exists && file.lengthSync() > 0;
+    _log('model exists: $exists');
+    if (exists) {
+      _log(
+          'model size MB: ${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(2)}');
+    }
+    _log('model download complete: $complete');
+    return complete;
   }
 
   Future<double> getDownloadProgress() async => _downloadProgress;
@@ -85,20 +108,41 @@ class SakhiAiService {
     onProgress(1);
   }
 
-  Future<void> loadModel() async {
+  Future<void> loadModel() {
+    if (_isLoaded && _model != null) return Future.value();
+    final activeLoad = _loadingFuture;
+    if (activeLoad != null) return activeLoad;
+
+    _loadingFuture = _loadModelInternal()
+        .timeout(const Duration(seconds: 45))
+        .then<void>((_) {
+      _isLoaded = true;
+    }).whenComplete(() => _loadingFuture = null);
+    return _loadingFuture!;
+  }
+
+  Future<void> _loadModelInternal() async {
+    _log('loadModel started');
     await _initGemma();
     if (!await isModelDownloaded()) {
       throw StateError(
-          'Sakhi is not ready yet. Please download the offline AI model first.');
+          "Sakhi's offline AI model is not downloaded yet. Please download it first.");
+    }
+    if (_model != null) {
+      _log('loadModel completed');
+      return;
     }
     final file = await _modelFile();
+    await logModelStatus();
     await _verifyModel(file);
     await FlutterGemma.installModel(modelType: ModelType.general)
         .fromFile(file.path)
         .install();
-    _model ??= await _createModel(PreferredBackend.gpu).catchError((_) {
+    _model = await _createModel(PreferredBackend.gpu).catchError((error) {
+      _log('gpu backend failed, retrying cpu: $error');
       return _createModel(PreferredBackend.cpu);
     });
+    _log('loadModel completed');
   }
 
   Future<String> generateReply({
@@ -106,31 +150,47 @@ class SakhiAiService {
     required String userMessage,
     required String languageCode,
   }) async {
+    _log('generateReply started');
     final safety = _safetyReply(userMessage);
     if (safety != null) {
-      await _memory.saveChatMessage(role: 'user', content: userMessage);
-      await _memory.saveChatMessage(role: 'assistant', content: safety);
+      _persistConversationInBackground(userMessage, safety);
+      _log('fallback/error message used: safety');
       return safety;
     }
 
     final boundary = _healthBoundaryReply(userMessage, languageCode);
     if (boundary != null) {
-      await _memory.saveChatMessage(role: 'user', content: userMessage);
-      await _memory.saveChatMessage(role: 'assistant', content: boundary);
-      await _memory.extractAndSaveMemories(
-        userMessage: userMessage,
-        assistantReply: boundary,
-      );
+      _persistConversationInBackground(userMessage, boundary);
+      _log('fallback/error message used: health boundary');
       return boundary;
+    }
+
+    if (kUseSakhiMockModel) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      const reply =
+          "I hear you. That sounds important, and I'm here with you. Can you tell me a little more about what happened?";
+      _persistConversationInBackground(userMessage, reply);
+      _log('generateReply completed, length=${reply.length}');
+      return reply;
     }
 
     try {
       if (!await isModelDownloaded()) {
-        return 'Sakhi is not ready yet. Please download the offline AI model first.';
+        _log('fallback/error message used: model missing');
+        return "Sakhi's offline AI model is not downloaded yet. Please download it first.";
       }
-      await loadModel().timeout(const Duration(seconds: 45));
-      final recent = await _memory.getRecentChatMessages(limit: 8);
-      final memories = await _memory.getRelevantMemories(userMessage);
+      try {
+        await loadModel().timeout(const Duration(seconds: 45));
+      } on TimeoutException {
+        _log('fallback/error message used: model load timeout');
+        return 'Sakhi is taking too long to start. Please try again.';
+      }
+      final recent = await _memory
+          .getRecentChatMessages(limit: 8)
+          .timeout(const Duration(seconds: 3), onTimeout: () => const []);
+      final memories = await _memory
+          .getRelevantMemories(userMessage)
+          .timeout(const Duration(seconds: 3), onTimeout: () => const []);
       final prompt = _buildPrompt(
         memories: memories,
         history: recent.isEmpty ? history.take(8).toList() : recent,
@@ -154,13 +214,19 @@ class SakhiAiService {
             .addQueryChunk(Message.text(text: prompt, isUser: true))
             .timeout(const Duration(seconds: 20));
         var words = 0;
+        final generationStarted = DateTime.now();
         await for (final response in chat.generateChatResponseAsync().timeout(
-          const Duration(seconds: 45),
+          const Duration(seconds: 35),
           onTimeout: (sink) {
             timedOut = true;
             sink.close();
           },
         )) {
+          if (DateTime.now().difference(generationStarted) >
+              const Duration(seconds: 35)) {
+            timedOut = true;
+            break;
+          }
           if (response case TextResponse(:final token)) {
             final cleaned = _cleanToken(token);
             if (cleaned.trim().isEmpty) continue;
@@ -176,20 +242,23 @@ class SakhiAiService {
             );
       }
 
-      if (timedOut && buffer.isEmpty) {
+      if (timedOut) {
         throw TimeoutException('Sakhi model did not return tokens in time');
       }
 
       final reply = _sanitizeReply(buffer.toString(), userMessage);
-      await _memory.saveChatMessage(role: 'user', content: userMessage);
-      await _memory.saveChatMessage(role: 'assistant', content: reply);
-      await _memory.extractAndSaveMemories(
-        userMessage: userMessage,
-        assistantReply: reply,
-      );
+      _persistConversationInBackground(userMessage, reply);
+      _log('generateReply completed, length=${reply.length}');
       return reply;
+    } on TimeoutException catch (error, stackTrace) {
+      debugPrint('Sakhi generation failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _log('fallback/error message used: timeout');
+      return 'Sakhi is taking too long to respond. Please try again.';
     } catch (error, stackTrace) {
-      debugPrint('Sakhi generation failed: $error\n$stackTrace');
+      debugPrint('Sakhi generation failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _log('fallback/error message used: failure');
       return "I'm having trouble thinking right now. Please try again.";
     }
   }
@@ -197,6 +266,29 @@ class SakhiAiService {
   Future<void> dispose() async {
     await _model?.close();
     _model = null;
+    _isLoaded = false;
+  }
+
+  void _persistConversationInBackground(String userMessage, String reply) {
+    unawaited(_persistConversation(userMessage, reply));
+  }
+
+  Future<void> _persistConversation(String userMessage, String reply) async {
+    try {
+      await _memory
+          .saveChatMessage(role: 'user', content: userMessage)
+          .timeout(const Duration(seconds: 3));
+      await _memory
+          .saveChatMessage(role: 'assistant', content: reply)
+          .timeout(const Duration(seconds: 3));
+      await _memory
+          .extractAndSaveMemories(
+              userMessage: userMessage, assistantReply: reply)
+          .timeout(const Duration(seconds: 3));
+    } catch (error, stackTrace) {
+      debugPrint('Sakhi memory persistence failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<InferenceModel> _createModel(PreferredBackend backend) {
@@ -311,8 +403,10 @@ Ask at most one gentle follow-up question.
         .trim();
     final lower = text.toLowerCase();
     final user = userMessage.trim().toLowerCase();
-    if (text.isEmpty ||
-        lower == user ||
+    if (text.isEmpty) {
+      return "I'm not sure how to answer that yet, but I'm here with you. Can you say it another way?";
+    }
+    if (lower == user ||
         (lower.length <= user.length + 8 && lower.contains(user)) ||
         _hasAny(lower, [
           'pcos detected',
@@ -343,4 +437,8 @@ Ask at most one gentle follow-up question.
 
   bool _hasAny(String text, List<String> patterns) =>
       patterns.any(text.contains);
+
+  void _log(String message) {
+    if (kDebugMode) debugPrint('[SakhiAI] $message');
+  }
 }

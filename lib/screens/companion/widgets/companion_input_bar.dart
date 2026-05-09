@@ -16,6 +16,13 @@ class CompanionInputBar extends StatefulWidget {
 
 class _CompanionInputBarState extends State<CompanionInputBar> {
   final controller = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
         child: Padding(

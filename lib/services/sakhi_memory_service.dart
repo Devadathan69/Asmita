@@ -198,7 +198,7 @@ class SakhiMemoryService {
       category: memory.category,
       confidence: explicit ? 1.0 : .72,
     );
-    debugPrint('Sakhi memory saved: ${memory.key}');
+    if (kDebugMode) debugPrint('[SakhiAI] memory saved: ${memory.key}');
   }
 
   Future<SakhiMemory> _memoryFromRow(Map<String, Object?> row) async {

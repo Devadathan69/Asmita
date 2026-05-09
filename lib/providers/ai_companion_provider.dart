@@ -22,12 +22,15 @@ final chatProvider = AsyncNotifierProvider<ChatNotifier, List<ChatMessage>>(
 );
 
 class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
+  int _generationSerial = 0;
+
   @override
   Future<List<ChatMessage>> build() async {
     final messages = await ref
         .read(sakhiAiServiceProvider)
         .memoryService
-        .getRecentChatMessages(limit: 60);
+        .getRecentChatMessages(limit: 60)
+        .timeout(const Duration(seconds: 3), onTimeout: () => const []);
     return messages.map(_toChatMessage).toList();
   }
 
@@ -35,25 +38,43 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || ref.read(sakhiGeneratingProvider)) return;
 
+    final service = ref.read(sakhiAiServiceProvider);
     ref.read(sakhiGeneratingProvider.notifier).state = true;
+    final generationId = ++_generationSerial;
     final now = DateTime.now();
-    final user = ChatMessage(
-      content: trimmed,
-      role: 'user',
-      timestamp: now,
-      sessionId: 'sakhi_local_memory',
-    );
-    final thinking = ChatMessage(
-      content: 'Sakhi is thinking...',
-      role: 'assistant',
-      timestamp: now,
-      sessionId: 'sakhi_local_memory',
-    );
-    state = AsyncData([...state.value ?? [], user, thinking]);
+    ChatMessage? thinking;
 
     try {
+      final user = ChatMessage(
+        content: trimmed,
+        role: 'user',
+        timestamp: now,
+        sessionId: 'sakhi_local_memory',
+      );
+      state = AsyncData([...state.value ?? [], user]);
+
+      if (!kUseSakhiMockModel) {
+        final modelReady = await service
+            .isModelDownloaded()
+            .timeout(const Duration(seconds: 3), onTimeout: () => false);
+        if (!modelReady) {
+          _appendAssistant(
+            "Sakhi's offline AI model is not downloaded yet. Please download it first.",
+          );
+          return;
+        }
+      }
+
+      thinking = ChatMessage(
+        content: 'Sakhi is thinking...',
+        role: 'assistant',
+        timestamp: now,
+        sessionId: 'sakhi_local_memory',
+      );
+      state = AsyncData([...state.value ?? [], thinking]);
+
       final history = (state.value ?? const [])
-          .where((message) => message.content != thinking.content)
+          .where((message) => message.content != thinking?.content)
           .map((message) => SakhiChatMessage(
                 role: message.role,
                 content: message.content,
@@ -67,32 +88,51 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
             userMessage: trimmed,
             languageCode: language,
           )
-          .timeout(const Duration(seconds: 75));
+          .timeout(const Duration(seconds: 90));
+      if (generationId != _generationSerial) return;
       final visible = (state.value ?? const [])
-          .where((message) => message.content != thinking.content)
+          .where((message) => message.content != thinking?.content)
           .toList();
-      state = AsyncData([
-        ...visible,
-        ChatMessage(
-          content: reply,
-          role: 'assistant',
-          timestamp: DateTime.now(),
-          sessionId: 'sakhi_local_memory',
-        ),
-      ]);
+      state = AsyncData([...visible]);
+      _appendAssistant(reply);
     } on TimeoutException catch (error, stackTrace) {
       debugPrint('Sakhi UI timeout: $error\n$stackTrace');
-      _replaceThinkingWithError(thinking);
+      if (generationId == _generationSerial) {
+        _replaceThinkingWithMessage(
+          thinking,
+          'Sakhi is taking too long to respond. Please try again.',
+        );
+      }
     } catch (error, stackTrace) {
       debugPrint('Sakhi send failed: $error\n$stackTrace');
-      _replaceThinkingWithError(thinking);
+      if (generationId == _generationSerial) {
+        _replaceThinkingWithMessage(
+          thinking,
+          "I'm having trouble thinking right now. Please try again.",
+        );
+      }
     } finally {
-      ref.read(sakhiGeneratingProvider.notifier).state = false;
+      if (generationId == _generationSerial) {
+        ref.read(sakhiGeneratingProvider.notifier).state = false;
+      }
     }
   }
 
+  void stopCurrentResponse() {
+    _generationSerial++;
+    ref.read(sakhiGeneratingProvider.notifier).state = false;
+    _replaceThinkingWithMessage(
+      null,
+      'I stopped that response. Please try again.',
+    );
+  }
+
   Future<void> clear() async {
-    await ref.read(sakhiAiServiceProvider).memoryService.clearChatHistory();
+    await ref
+        .read(sakhiAiServiceProvider)
+        .memoryService
+        .clearChatHistory()
+        .timeout(const Duration(seconds: 3));
     state = const AsyncData([]);
   }
 
@@ -105,14 +145,21 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
     );
   }
 
-  void _replaceThinkingWithError(ChatMessage thinking) {
+  void _replaceThinkingWithMessage(ChatMessage? thinking, String message) {
     final visible = (state.value ?? const [])
-        .where((message) => message.content != thinking.content)
+        .where((message) => thinking == null
+            ? message.content != 'Sakhi is thinking...'
+            : message.content != thinking.content)
         .toList();
+    state = AsyncData([...visible]);
+    _appendAssistant(message);
+  }
+
+  void _appendAssistant(String message) {
     state = AsyncData([
-      ...visible,
+      ...state.value ?? const [],
       ChatMessage(
-        content: "I'm having trouble thinking right now. Please try again.",
+        content: message,
         role: 'assistant',
         timestamp: DateTime.now(),
         sessionId: 'sakhi_local_memory',

@@ -25,12 +25,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
   int refresh = 0;
   Timer? _stuckTimer;
   bool _showStuckRecovery = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showMemoryNote());
-  }
+  bool _memoryNoteQueued = false;
 
   Future<void> _showMemoryNote() async {
     final prefs = await SharedPreferences.getInstance();
@@ -86,6 +81,12 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
               ref.invalidate(chatProvider);
             },
           );
+        }
+        if (!_memoryNoteQueued) {
+          _memoryNoteQueued = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showMemoryNote();
+          });
         }
         return Scaffold(
           body: GradientBackground(

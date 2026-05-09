@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:llama_flutter_android/llama_flutter_android.dart' as llama;
@@ -86,7 +85,7 @@ class SakhiAiService {
     await controller.loadModel(
       modelPath: file.path,
       threads: _safeThreadCount(),
-      contextSize: 1024,
+      contextSize: 512,
       gpuLayers: 0,
     );
     _log('loadModel success');
@@ -141,11 +140,12 @@ class SakhiAiService {
             .generateChat(
           messages: messages,
           template: 'chatml',
-          maxTokens: 120,
+          maxTokens: 80,
           temperature: .7,
           topP: .9,
-          topK: 40,
+          topK: 20,
           repeatPenalty: 1.1,
+          repeatLastN: 32,
           seed: DateTime.now().millisecondsSinceEpoch % 100000,
         )
             .timeout(
@@ -279,8 +279,7 @@ $memoryText
   }
 
   int _safeThreadCount() {
-    if (Platform.numberOfProcessors <= 2) return 1;
-    return 2;
+    return 1;
   }
 
   static const _systemPrompt = '''

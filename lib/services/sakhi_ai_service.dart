@@ -125,7 +125,8 @@ class SakhiAiService {
       }
       await loadModel().timeout(const Duration(seconds: 45));
 
-      final messages = await _buildMessages(userMessage, languageCode);
+      final profile = await _generationProfile();
+      final prompt = await _buildPrompt(userMessage, languageCode);
       final controller = _controller;
       if (controller == null) {
         throw StateError('Sakhi runtime is not loaded');
@@ -137,10 +138,9 @@ class SakhiAiService {
 
       try {
         await for (final token in controller
-            .generateChat(
-          messages: messages,
-          template: 'chatml',
-          maxTokens: 80,
+            .generate(
+          prompt: prompt,
+          maxTokens: profile.maxTokens,
           temperature: .7,
           topP: .9,
           topK: 20,
@@ -149,14 +149,13 @@ class SakhiAiService {
           seed: DateTime.now().millisecondsSinceEpoch % 100000,
         )
             .timeout(
-          const Duration(seconds: 35),
+          profile.timeout,
           onTimeout: (sink) {
             timedOut = true;
             sink.close();
           },
         )) {
-          if (DateTime.now().difference(started) >
-              const Duration(seconds: 35)) {
+          if (DateTime.now().difference(started) > profile.timeout) {
             timedOut = true;
             break;
           }
@@ -213,14 +212,28 @@ class SakhiAiService {
 
   Future<void> dispose() => unloadModel();
 
-  Future<List<llama.ChatMessage>> _buildMessages(
+  Future<_GenerationProfile> _generationProfile() async {
+    final model = await _modelManager.selectedModelInfo();
+    if (model?.tier == SakhiModelTier.better) {
+      return const _GenerationProfile(
+        maxTokens: 72,
+        timeout: Duration(seconds: 75),
+      );
+    }
+    return const _GenerationProfile(
+      maxTokens: 96,
+      timeout: Duration(seconds: 45),
+    );
+  }
+
+  Future<String> _buildPrompt(
     String userMessage,
     String languageCode,
   ) async {
     final recent = kDisableSakhiMemoryForDebug
         ? const <SakhiChatMessage>[]
         : await _memory
-            .getRecentChatMessages(limit: 8)
+            .getRecentChatMessages(limit: 4)
             .timeout(const Duration(seconds: 3), onTimeout: () => const []);
     final memories = kDisableSakhiMemoryForDebug
         ? const <SakhiMemory>[]
@@ -228,33 +241,24 @@ class SakhiAiService {
             .getRelevantMemories(userMessage)
             .timeout(const Duration(seconds: 3), onTimeout: () => const []);
 
-    final memoryText = memories.isEmpty
-        ? '- No saved local preferences yet.'
-        : memories
-            .take(5)
-            .map((memory) => '- User shared previously: ${memory.value}')
-            .join('\n');
+    final memoryText =
+        memories.take(2).map((memory) => '- ${memory.value}').join('\n').trim();
+    final recentText = recent.take(4).map((message) {
+      final role = message.role == 'assistant' ? 'assistant' : 'user';
+      return '<|im_start|>$role\n${message.content}<|im_end|>';
+    }).join('\n');
 
-    return [
-      llama.ChatMessage(
-        role: 'system',
-        content: '''
+    final memoryBlock = memoryText.isEmpty ? '' : '\nMemory:\n$memoryText';
+    final recentBlock = recentText.isEmpty ? '' : '\n$recentText';
+    return '''
+<|im_start|>system
 $_systemPrompt
-
-LANGUAGE STYLE:
-$languageCode
-
-LOCAL MEMORY:
-$memoryText
-''',
-      ),
-      for (final message in recent.take(8))
-        llama.ChatMessage(
-          role: message.role == 'assistant' ? 'assistant' : 'user',
-          content: message.content,
-        ),
-      llama.ChatMessage(role: 'user', content: userMessage),
-    ];
+Reply language/style: $languageCode.$memoryBlock<|im_end|>
+$recentBlock
+<|im_start|>user
+$userMessage<|im_end|>
+<|im_start|>assistant
+''';
   }
 
   Future<void> _persistConversation(String userMessage, String reply) async {
@@ -282,20 +286,13 @@ $memoryText
     return 1;
   }
 
-  static const _systemPrompt = '''
-You are Sakhi, a warm offline companion inside the Asmita app for adolescent girls.
-You are friendly, gentle, and supportive, like a caring elder sister.
-You are not a doctor and you must never diagnose PCOS or any disease.
-Your job is to listen, comfort, explain simple health concepts, and encourage the girl to speak to an ASHA worker, trusted adult, or doctor when needed.
-Keep replies short, clear, and kind.
-Never shame the user.
-Never create fear.
-Never say "PCOS detected", "you have PCOS", "diagnosis confirmed", "disease confirmed", or "abnormal".
-Use phrases like "worth discussing with a doctor", "screening may help", or "a health worker can guide you".
-If the user asks about emergency symptoms, advise immediate help from a trusted adult or doctor.
-If the user writes in Malayalam, Hindi, or Manglish, reply in the same language/style as much as possible.
-Ask at most one gentle follow-up question.
-''';
+  static const _systemPrompt =
+      'You are Sakhi, a warm offline companion for adolescent girls. '
+      'Talk like a caring elder sister. Keep replies short, kind, and clear. '
+      'You are not a doctor. Never diagnose PCOS or any disease. '
+      'Never say "PCOS detected", "you have PCOS", "diagnosis confirmed", '
+      '"disease confirmed", or "abnormal". Suggest an ASHA worker or doctor '
+      'for medical worries. Ask at most one gentle follow-up question.';
 
   String? _safetyReply(String text) {
     final lower = text.toLowerCase();
@@ -392,4 +389,14 @@ Ask at most one gentle follow-up question.
   void _log(String message) {
     if (kDebugMode) debugPrint('[SakhiAI] $message');
   }
+}
+
+class _GenerationProfile {
+  const _GenerationProfile({
+    required this.maxTokens,
+    required this.timeout,
+  });
+
+  final int maxTokens;
+  final Duration timeout;
 }

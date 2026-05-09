@@ -13,42 +13,74 @@ class RiskScoreCard extends StatelessWidget {
     final color = tierColor(result.color);
     return Container(
       width: double.infinity,
-      height: 190,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: color.withOpacity(.15),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color, width: 2),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            '${result.score}',
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w900,
-              color: color,
-            ),
-          ),
-          Text('/85', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            width: 104,
+            height: 104,
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(999),
+              shape: BoxShape.circle,
+              color: color.withOpacity(.12),
+              border: Border.all(color: color, width: 3),
             ),
-            child: Text(
-              result.tier,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${result.score}',
+                    style: TextStyle(
+                      fontSize: 38,
+                      height: .95,
+                      fontWeight: FontWeight.w900,
+                      color: color,
+                    ),
+                  ),
+                  Text('of 85', style: Theme.of(context).textTheme.labelLarge),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(result.action, textAlign: TextAlign.center),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    result.tier,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  result.action,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  result.displayMessage,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

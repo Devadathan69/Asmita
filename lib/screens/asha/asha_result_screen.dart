@@ -43,14 +43,15 @@ class AshaResultScreen extends ConsumerWidget {
             children: [
               Text('Screening Result',
                   style: Theme.of(context).textTheme.headlineSmall),
+              if (state.girlName != null || state.ageYears != null) ...[
+                const SizedBox(height: 8),
+                _ScreeningIdentityCard(
+                  name: state.girlName,
+                  ageYears: state.ageYears,
+                ),
+              ],
               const SizedBox(height: 16),
               RiskScoreCard(result: result),
-              const SizedBox(height: 12),
-              Text(
-                result.displayMessage,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
               const SizedBox(height: 16),
               AsmitaCard(
                 child: ExpansionTile(
@@ -146,6 +147,35 @@ class AshaResultScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ScreeningIdentityCard extends StatelessWidget {
+  const _ScreeningIdentityCard({this.name, this.ageYears});
+
+  final String? name;
+  final int? ageYears;
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = [
+      if ((name ?? '').trim().isNotEmpty) name!.trim(),
+      if (ageYears != null) '$ageYears years',
+    ];
+    return AsmitaCard(
+      child: Row(
+        children: [
+          const CircleAvatar(child: Icon(Icons.person_outline_rounded)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              parts.join(' • '),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ],
       ),
     );
   }

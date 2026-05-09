@@ -81,7 +81,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
             userMessage: trimmed,
             languageCode: language,
           )
-          .timeout(const Duration(seconds: 35));
+          .timeout(const Duration(seconds: 90));
       if (generationId != _generationSerial) return;
       final visible = (state.value ?? const [])
           .where((message) => message.content != thinking?.content)

@@ -19,6 +19,8 @@ class AshaMeasurementsScreen extends ConsumerStatefulWidget {
 class _AshaMeasurementsScreenState
     extends ConsumerState<AshaMeasurementsScreen> {
   final formKey = GlobalKey<FormState>();
+  final name = TextEditingController();
+  final age = TextEditingController();
   final height = TextEditingController();
   final weight = TextEditingController();
   bool sudden = false;
@@ -45,6 +47,32 @@ class _AshaMeasurementsScreenState
                 AppBar(title: const Text('Height & Weight')),
                 const Text('Used to calculate BMI and adjust screening'),
                 const SizedBox(height: 18),
+                TextFormField(
+                  controller: name,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Name or initials (optional)',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: age,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Age (optional)',
+                    prefixIcon: Icon(Icons.cake_outlined),
+                  ),
+                  validator: (value) {
+                    if ((value ?? '').trim().isEmpty) return null;
+                    final n = int.tryParse(value!.trim());
+                    if (n == null || n < 8 || n > 25) {
+                      return 'Enter age 8-25 or leave blank';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
                 _field('Height (cm)', height, 100, 220),
                 const SizedBox(height: 12),
                 _field('Weight (kg)', weight, 20, 150),
@@ -76,6 +104,8 @@ class _AshaMeasurementsScreenState
                   onPressed: () {
                     if (formKey.currentState!.validate()) {
                       ref.read(ashaScreeningProvider.notifier).setMeasurements(
+                            girlName: name.text,
+                            ageYears: int.tryParse(age.text.trim()),
                             heightCm: double.parse(height.text),
                             weightKg: double.parse(weight.text),
                             suddenOnset: sudden,
@@ -90,6 +120,15 @@ class _AshaMeasurementsScreenState
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    name.dispose();
+    age.dispose();
+    height.dispose();
+    weight.dispose();
+    super.dispose();
   }
 
   Widget _field(

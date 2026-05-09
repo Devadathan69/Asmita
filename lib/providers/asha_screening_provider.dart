@@ -16,6 +16,8 @@ enum ScreeningStep {
 
 class ScreeningState {
   const ScreeningState({
+    this.girlName,
+    this.ageYears,
     this.neckImagePath,
     this.knuckleImagePath,
     this.faceImagePath,
@@ -41,6 +43,8 @@ class ScreeningState {
     this.suddenOnset = false,
   });
 
+  final String? girlName;
+  final int? ageYears;
   final String? neckImagePath;
   final String? knuckleImagePath;
   final String? faceImagePath;
@@ -66,6 +70,8 @@ class ScreeningState {
   final bool suddenOnset;
 
   ScreeningState copyWith({
+    String? girlName,
+    int? ageYears,
     String? neckImagePath,
     String? knuckleImagePath,
     String? faceImagePath,
@@ -91,6 +97,8 @@ class ScreeningState {
     bool? suddenOnset,
   }) {
     return ScreeningState(
+      girlName: girlName ?? this.girlName,
+      ageYears: ageYears ?? this.ageYears,
       neckImagePath: neckImagePath ?? this.neckImagePath,
       knuckleImagePath: knuckleImagePath ?? this.knuckleImagePath,
       faceImagePath: faceImagePath ?? this.faceImagePath,
@@ -146,12 +154,16 @@ class AshaScreeningNotifier extends StateNotifier<ScreeningState> {
   }
 
   void setMeasurements({
+    String? girlName,
+    int? ageYears,
     required double heightCm,
     required double weightKg,
     required bool suddenOnset,
   }) {
     final meters = heightCm / 100;
     state = state.copyWith(
+      girlName: girlName?.trim().isEmpty == true ? null : girlName?.trim(),
+      ageYears: ageYears,
       heightCm: heightCm,
       weightKg: weightKg,
       bmi: weightKg / (meters * meters),

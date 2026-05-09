@@ -128,7 +128,7 @@ class SakhiAiService {
       if (!await isModelDownloaded()) {
         return 'Sakhi is not ready yet. Please download the offline AI model first.';
       }
-      await loadModel();
+      await loadModel().timeout(const Duration(seconds: 45));
       final recent = await _memory.getRecentChatMessages(limit: 8);
       final memories = await _memory.getRelevantMemories(userMessage);
       final prompt = _buildPrompt(
@@ -137,19 +137,30 @@ class SakhiAiService {
         userMessage: userMessage,
         languageCode: languageCode,
       );
-      final chat = await _model!.createChat(
-        temperature: .7,
-        topK: 40,
-        topP: .9,
-        randomSeed: DateTime.now().millisecondsSinceEpoch % 100000,
-        tokenBuffer: 180,
-        systemInstruction: _systemPrompt,
-      );
+      final chat = await _model!
+          .createChat(
+            temperature: .7,
+            topK: 40,
+            topP: .9,
+            randomSeed: DateTime.now().millisecondsSinceEpoch % 100000,
+            tokenBuffer: 180,
+            systemInstruction: _systemPrompt,
+          )
+          .timeout(const Duration(seconds: 20));
       final buffer = StringBuffer();
+      var timedOut = false;
       try {
-        await chat.addQueryChunk(Message.text(text: prompt, isUser: true));
+        await chat
+            .addQueryChunk(Message.text(text: prompt, isUser: true))
+            .timeout(const Duration(seconds: 20));
         var words = 0;
-        await for (final response in chat.generateChatResponseAsync()) {
+        await for (final response in chat.generateChatResponseAsync().timeout(
+          const Duration(seconds: 45),
+          onTimeout: (sink) {
+            timedOut = true;
+            sink.close();
+          },
+        )) {
           if (response case TextResponse(:final token)) {
             final cleaned = _cleanToken(token);
             if (cleaned.trim().isEmpty) continue;
@@ -159,7 +170,14 @@ class SakhiAiService {
           }
         }
       } finally {
-        await chat.close();
+        await chat.close().timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {},
+            );
+      }
+
+      if (timedOut && buffer.isEmpty) {
+        throw TimeoutException('Sakhi model did not return tokens in time');
       }
 
       final reply = _sanitizeReply(buffer.toString(), userMessage);

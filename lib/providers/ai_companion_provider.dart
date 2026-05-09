@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../db/models/chat_message.dart';
@@ -57,11 +60,14 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
                 timestamp: message.timestamp,
               ))
           .toList();
-      final reply = await ref.read(sakhiAiServiceProvider).generateReply(
+      final reply = await ref
+          .read(sakhiAiServiceProvider)
+          .generateReply(
             history: history,
             userMessage: trimmed,
             languageCode: language,
-          );
+          )
+          .timeout(const Duration(seconds: 75));
       final visible = (state.value ?? const [])
           .where((message) => message.content != thinking.content)
           .toList();
@@ -74,6 +80,12 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
           sessionId: 'sakhi_local_memory',
         ),
       ]);
+    } on TimeoutException catch (error, stackTrace) {
+      debugPrint('Sakhi UI timeout: $error\n$stackTrace');
+      _replaceThinkingWithError(thinking);
+    } catch (error, stackTrace) {
+      debugPrint('Sakhi send failed: $error\n$stackTrace');
+      _replaceThinkingWithError(thinking);
     } finally {
       ref.read(sakhiGeneratingProvider.notifier).state = false;
     }
@@ -91,5 +103,20 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
       timestamp: message.timestamp,
       sessionId: 'sakhi_local_memory',
     );
+  }
+
+  void _replaceThinkingWithError(ChatMessage thinking) {
+    final visible = (state.value ?? const [])
+        .where((message) => message.content != thinking.content)
+        .toList();
+    state = AsyncData([
+      ...visible,
+      ChatMessage(
+        content: "I'm having trouble thinking right now. Please try again.",
+        role: 'assistant',
+        timestamp: DateTime.now(),
+        sessionId: 'sakhi_local_memory',
+      ),
+    ]);
   }
 }

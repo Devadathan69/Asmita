@@ -53,8 +53,10 @@ class SakhiModelManager {
     NetworkPrivacyService network = const NetworkPrivacyService(),
   }) : _network = network;
 
-  static const qwenLightUrl = 'PASTE_QWEN_0_5B_Q4_GGUF_DIRECT_URL_HERE';
-  static const qwenBetterUrl = 'PASTE_QWEN_1_5B_Q4_GGUF_DIRECT_URL_HERE';
+  static const qwenLightUrl =
+      'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf';
+  static const qwenBetterUrl =
+      'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf';
 
   static const _selectedModelPathKey = 'sakhi_selected_model_path';
   static const _selectedModelTierKey = 'sakhi_selected_model_tier';
@@ -68,7 +70,7 @@ class SakhiModelManager {
       displayName: 'Light Offline AI',
       fileName: 'qwen2_5_0_5b_instruct_q4.gguf',
       downloadUrl: qwenLightUrl,
-      approximateSizeMb: 420,
+      approximateSizeMb: 491,
       minRamGb: 3,
     ),
     SakhiModelInfo(

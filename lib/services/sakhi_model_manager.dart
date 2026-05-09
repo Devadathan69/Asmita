@@ -48,6 +48,20 @@ class SakhiDownloadProgress {
   final String status;
 }
 
+class ModelValidationResult {
+  const ModelValidationResult({
+    required this.isValid,
+    this.path,
+    this.sizeMb = 0,
+    this.errorMessage,
+  });
+
+  final bool isValid;
+  final String? path;
+  final double sizeMb;
+  final String? errorMessage;
+}
+
 class SakhiModelManager {
   SakhiModelManager({
     NetworkPrivacyService network = const NetworkPrivacyService(),
@@ -60,7 +74,7 @@ class SakhiModelManager {
 
   static const _selectedModelPathKey = 'sakhi_selected_model_path';
   static const _selectedModelTierKey = 'sakhi_selected_model_tier';
-  static const minimumUsableModelMb = 100;
+  static const minimumUsableModelMb = 50;
 
   final NetworkPrivacyService _network;
 
@@ -100,26 +114,46 @@ class SakhiModelManager {
   }
 
   Future<File?> selectedModelFile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final selectedPath = prefs.getString(_selectedModelPathKey);
-    if (selectedPath != null) {
-      final selected = File(selectedPath);
-      if (await _isUsable(selected)) {
-        await _logModel(selected, selectedPath);
-        return selected;
-      }
+    final selectedValidation = await validateSelectedModel();
+    if (selectedValidation.isValid && selectedValidation.path != null) {
+      return File(selectedValidation.path!);
     }
 
+    final prefs = await SharedPreferences.getInstance();
     for (final info in models) {
       final file = await modelFileFor(info.tier);
-      if (await _isUsable(file)) {
+      final validation = await _validateFile(file);
+      if (validation.isValid) {
         await _saveSelection(info.tier, file.path);
         await _logModel(file, file.path);
         return file;
       }
     }
+    await prefs.remove(_selectedModelPathKey);
+    await prefs.remove(_selectedModelTierKey);
     _log('exists false');
     return null;
+  }
+
+  Future<ModelValidationResult> validateSelectedModel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tierName = prefs.getString(_selectedModelTierKey);
+    if (tierName != null) _log('selected tier: $tierName');
+
+    final selectedPath = prefs.getString(_selectedModelPathKey);
+    _log('expected model path: ${selectedPath ?? 'null'}');
+    if (selectedPath == null || selectedPath.trim().isEmpty) {
+      return const ModelValidationResult(
+        isValid: false,
+        errorMessage: 'No selected model path',
+      );
+    }
+
+    final result = await _validateFile(File(selectedPath));
+    if (!result.isValid) {
+      _log('validation failed: ${result.errorMessage}');
+    }
+    return result;
   }
 
   Future<SakhiModelInfo?> selectedModelInfo() async {
@@ -136,7 +170,8 @@ class SakhiModelManager {
 
   Future<void> selectModel(SakhiModelTier tier) async {
     final file = await modelFileFor(tier);
-    if (!await _isUsable(file)) {
+    final validation = await _validateFile(file);
+    if (!validation.isValid) {
       throw const SakhiModelException(
         "Sakhi's offline AI model is not downloaded yet. Please download it first.",
       );
@@ -171,6 +206,7 @@ class SakhiModelManager {
       await _network.downloadFile(
         info.downloadUrl,
         temp,
+        rejectHtmlContent: true,
         shouldCancel: shouldCancel,
         onProgress: (progress) {
           onProgress(SakhiDownloadProgress(
@@ -196,13 +232,14 @@ class SakhiModelManager {
       if (shouldCancel?.call() == true) {
         throw const SakhiModelException('Download cancelled');
       }
-      final sizeMb = await _sizeMb(temp);
-      if (sizeMb < minimumUsableModelMb) {
+      final validation = await _validateFile(temp);
+      if (!validation.isValid) {
         await temp.delete();
         throw const SakhiModelException(
-          'Downloaded model file is too small. Please check the download link.',
+          'Model download failed or file was incomplete. Please try again.',
         );
       }
+      final sizeMb = validation.sizeMb;
       if (await destination.exists()) await destination.delete();
       await temp.rename(destination.path);
       await _saveSelection(tier, destination.path);
@@ -226,9 +263,73 @@ class SakhiModelManager {
     _log('selected model ${infoForTier(tier).displayName}');
   }
 
-  Future<bool> _isUsable(File file) async {
-    if (!await file.exists()) return false;
-    return await _sizeMb(file) >= minimumUsableModelMb;
+  Future<ModelValidationResult> _validateFile(File file) async {
+    final path = file.path;
+    _log('expected model path: $path');
+    final exists = await file.exists();
+    _log('exists: $exists');
+    if (!exists) {
+      return ModelValidationResult(
+        isValid: false,
+        path: path,
+        errorMessage: 'Model file does not exist',
+      );
+    }
+    if (!path.toLowerCase().endsWith('.gguf') &&
+        !path.toLowerCase().endsWith('.download')) {
+      return ModelValidationResult(
+        isValid: false,
+        path: path,
+        errorMessage: 'Model file is not a GGUF file',
+      );
+    }
+    try {
+      final sizeMb = await _sizeMb(file);
+      _log('file size MB: ${sizeMb.toStringAsFixed(2)}');
+      if (sizeMb < minimumUsableModelMb) {
+        return ModelValidationResult(
+          isValid: false,
+          path: path,
+          sizeMb: sizeMb,
+          errorMessage: 'Model file is too small',
+        );
+      }
+      final handle = await file.open();
+      try {
+        final bytes = await handle.read(512);
+        final header = String.fromCharCodes(bytes.take(128)).toLowerCase();
+        if (header.contains('<!doctype html') ||
+            header.contains('<html') ||
+            header.contains('access denied')) {
+          return ModelValidationResult(
+            isValid: false,
+            path: path,
+            sizeMb: sizeMb,
+            errorMessage: 'Model file looks like an HTML/error page',
+          );
+        }
+        if (bytes.length >= 4) {
+          final magic = String.fromCharCodes(bytes.take(4));
+          if (magic != 'GGUF') {
+            return ModelValidationResult(
+              isValid: false,
+              path: path,
+              sizeMb: sizeMb,
+              errorMessage: 'Model file has invalid GGUF header',
+            );
+          }
+        }
+      } finally {
+        await handle.close();
+      }
+      return ModelValidationResult(isValid: true, path: path, sizeMb: sizeMb);
+    } catch (error) {
+      return ModelValidationResult(
+        isValid: false,
+        path: path,
+        errorMessage: 'Model file cannot be read: $error',
+      );
+    }
   }
 
   Future<double> _sizeMb(File file) async {

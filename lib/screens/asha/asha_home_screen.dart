@@ -28,11 +28,6 @@ class AshaHomeScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      IconButton(
-                        onPressed: () => context.go('/mode'),
-                        icon: const Icon(Icons.arrow_back),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,6 +39,18 @@ class AshaHomeScreen extends ConsumerWidget {
                                 'Project Asmita - Adolescent Health Screening'),
                           ],
                         ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded),
+                        onSelected: (value) {
+                          if (value == 'personal') context.go('/home');
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'personal',
+                            child: Text('Switch to Personal Tracking'),
+                          ),
+                        ],
                       ),
                     ],
                   ),

@@ -39,6 +39,7 @@ class NetworkPrivacyService {
     void Function(double progress)? onProgress,
     void Function(int receivedBytes, int? totalBytes)? onBytesProgress,
     bool Function()? shouldCancel,
+    bool rejectHtmlContent = false,
   }) async {
     final client = http.Client();
     try {
@@ -53,6 +54,14 @@ class NetworkPrivacyService {
         throw NetworkPrivacyException(
           message,
           statusCode: response.statusCode,
+        );
+      }
+      final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+      if (rejectHtmlContent &&
+          (contentType.contains('text/html') ||
+              contentType.contains('application/xhtml'))) {
+        throw const NetworkPrivacyException(
+          'Download returned a web page instead of a model file',
         );
       }
 

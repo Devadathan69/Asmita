@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:llama_flutter_android/llama_flutter_android.dart' as llama;
@@ -9,6 +8,7 @@ import 'sakhi_memory_service.dart';
 import 'sakhi_model_manager.dart';
 
 const bool kUseSakhiMockModel = false;
+const bool kDisableSakhiMemoryForDebug = false;
 
 class SakhiAiService {
   SakhiAiService({
@@ -50,44 +50,46 @@ class SakhiAiService {
 
     _loadingFuture = _loadModelInternal()
         .timeout(const Duration(seconds: 45))
-        .then<void>((_) => _isLoaded = true)
-        .whenComplete(() => _loadingFuture = null);
+        .then<void>((_) {
+      _isLoaded = true;
+    }).catchError((Object error, StackTrace stackTrace) {
+      _isLoaded = false;
+      debugPrint('[SakhiAI] loadModel failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      throw error;
+    }).whenComplete(() => _loadingFuture = null);
     return _loadingFuture!;
   }
 
   Future<void> _loadModelInternal() async {
-    _log('load start');
+    _log('loadModel start');
+    final validation = await _modelManager.validateSelectedModel();
+    if (!validation.isValid || validation.path == null) {
+      throw const SakhiModelException(
+        "Sakhi's offline AI model is missing or incomplete. Please download it again.",
+      );
+    }
     final file = await _modelManager.selectedModelFile();
     if (file == null) {
       throw const SakhiModelException(
-        "Sakhi's offline AI model is not downloaded yet. Please download it first.",
+        "Sakhi's offline AI model is missing or incomplete. Please download it again.",
       );
     }
 
     final controller = _controller ?? llama.LlamaController();
     _controller = controller;
     if (await controller.isModelLoaded()) {
-      _log('load success');
+      _log('loadModel success');
       return;
-    }
-
-    int? gpuLayers;
-    try {
-      final gpu = await controller.detectGpu().timeout(
-            const Duration(seconds: 5),
-          );
-      gpuLayers = gpu.recommendedGpuLayers;
-    } catch (error) {
-      _log('gpu detect failed: $error');
     }
 
     await controller.loadModel(
       modelPath: file.path,
       threads: _safeThreadCount(),
-      contextSize: 2048,
-      gpuLayers: gpuLayers,
+      contextSize: 1024,
+      gpuLayers: 0,
     );
-    _log('load success');
+    _log('loadModel success');
   }
 
   Future<String> generateReply({
@@ -117,8 +119,10 @@ class SakhiAiService {
     }
 
     try {
-      if (!await hasUsableModel()) {
-        return "Sakhi's offline AI model is not downloaded yet. Please download it first.";
+      final validation = await _modelManager.validateSelectedModel();
+      if (!validation.isValid) {
+        _log('generation failed: invalid model ${validation.errorMessage}');
+        return "Sakhi's offline AI model is missing or incomplete. Please download it again.";
       }
       await loadModel().timeout(const Duration(seconds: 45));
 
@@ -137,11 +141,11 @@ class SakhiAiService {
             .generateChat(
           messages: messages,
           template: 'chatml',
-          maxTokens: 180,
-          temperature: .75,
+          maxTokens: 120,
+          temperature: .7,
           topP: .9,
           topK: 40,
-          repeatPenalty: 1.15,
+          repeatPenalty: 1.1,
           seed: DateTime.now().millisecondsSinceEpoch % 100000,
         )
             .timeout(
@@ -165,6 +169,7 @@ class SakhiAiService {
                 onTimeout: () {},
               ));
         }
+        _log('generation finished cleanup');
       }
 
       if (timedOut) {
@@ -172,7 +177,7 @@ class SakhiAiService {
       }
 
       final reply = _sanitizeReply(buffer.toString(), userMessage);
-      _log('generation complete length=${reply.length}');
+      _log('generation success length=${reply.length}');
       return reply;
     } on TimeoutException catch (error, stackTrace) {
       debugPrint('[SakhiAI] generation failed: $error');
@@ -212,12 +217,16 @@ class SakhiAiService {
     String userMessage,
     String languageCode,
   ) async {
-    final recent = await _memory
-        .getRecentChatMessages(limit: 8)
-        .timeout(const Duration(seconds: 3), onTimeout: () => const []);
-    final memories = await _memory
-        .getRelevantMemories(userMessage)
-        .timeout(const Duration(seconds: 3), onTimeout: () => const []);
+    final recent = kDisableSakhiMemoryForDebug
+        ? const <SakhiChatMessage>[]
+        : await _memory
+            .getRecentChatMessages(limit: 8)
+            .timeout(const Duration(seconds: 3), onTimeout: () => const []);
+    final memories = kDisableSakhiMemoryForDebug
+        ? const <SakhiMemory>[]
+        : await _memory
+            .getRelevantMemories(userMessage)
+            .timeout(const Duration(seconds: 3), onTimeout: () => const []);
 
     final memoryText = memories.isEmpty
         ? '- No saved local preferences yet.'
@@ -249,6 +258,7 @@ $memoryText
   }
 
   Future<void> _persistConversation(String userMessage, String reply) async {
+    if (kDisableSakhiMemoryForDebug) return;
     try {
       await _memory
           .saveChatMessage(role: 'user', content: userMessage)
@@ -269,7 +279,8 @@ $memoryText
   }
 
   int _safeThreadCount() {
-    return max(2, min(4, Platform.numberOfProcessors - 1));
+    if (Platform.numberOfProcessors <= 2) return 1;
+    return 2;
   }
 
   static const _systemPrompt = '''

@@ -39,6 +39,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
     if (trimmed.isEmpty || ref.read(sakhiGeneratingProvider)) return;
 
     final service = ref.read(sakhiAiServiceProvider);
+    debugPrint('[SakhiAI] sendMessage start');
     ref.read(sakhiGeneratingProvider.notifier).state = true;
     final generationId = ++_generationSerial;
     final now = DateTime.now();
@@ -57,9 +58,10 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
         final modelReady = await service
             .hasUsableModel()
             .timeout(const Duration(seconds: 3), onTimeout: () => false);
+        debugPrint('[SakhiAI] hasUsableModel: $modelReady');
         if (!modelReady) {
           _appendAssistant(
-            "Sakhi's offline AI model is not downloaded yet. Please download it first.",
+            "Sakhi's offline AI model is missing or incomplete. Please download it again.",
           );
           return;
         }

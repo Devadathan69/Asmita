@@ -37,6 +37,8 @@ class NetworkPrivacyService {
     String url,
     File destination, {
     void Function(double progress)? onProgress,
+    void Function(int receivedBytes, int? totalBytes)? onBytesProgress,
+    bool Function()? shouldCancel,
   }) async {
     final client = http.Client();
     try {
@@ -61,8 +63,12 @@ class NetworkPrivacyService {
       try {
         await for (final chunk
             in response.stream.timeout(const Duration(minutes: 12))) {
+          if (shouldCancel?.call() == true) {
+            throw const NetworkPrivacyException('Download cancelled');
+          }
           received += chunk.length;
           sink.add(chunk);
+          onBytesProgress?.call(received, total);
           if (total != null && total > 0) {
             onProgress?.call((received / total).clamp(0, 1));
           }

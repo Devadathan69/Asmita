@@ -55,7 +55,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
 
       if (!kUseSakhiMockModel) {
         final modelReady = await service
-            .isModelDownloaded()
+            .hasUsableModel()
             .timeout(const Duration(seconds: 3), onTimeout: () => false);
         if (!modelReady) {
           _appendAssistant(
@@ -73,28 +73,20 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
       );
       state = AsyncData([...state.value ?? [], thinking]);
 
-      final history = (state.value ?? const [])
-          .where((message) => message.content != thinking?.content)
-          .map((message) => SakhiChatMessage(
-                role: message.role,
-                content: message.content,
-                timestamp: message.timestamp,
-              ))
-          .toList();
       final reply = await ref
           .read(sakhiAiServiceProvider)
           .generateReply(
-            history: history,
             userMessage: trimmed,
             languageCode: language,
           )
-          .timeout(const Duration(seconds: 90));
+          .timeout(const Duration(seconds: 35));
       if (generationId != _generationSerial) return;
       final visible = (state.value ?? const [])
           .where((message) => message.content != thinking?.content)
           .toList();
       state = AsyncData([...visible]);
       _appendAssistant(reply);
+      unawaited(service.persistConversationInBackground(trimmed, reply));
     } on TimeoutException catch (error, stackTrace) {
       debugPrint('Sakhi UI timeout: $error\n$stackTrace');
       if (generationId == _generationSerial) {
@@ -120,6 +112,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
 
   void stopCurrentResponse() {
     _generationSerial++;
+    unawaited(ref.read(sakhiAiServiceProvider).stopGeneration());
     ref.read(sakhiGeneratingProvider.notifier).state = false;
     _replaceThinkingWithMessage(
       null,

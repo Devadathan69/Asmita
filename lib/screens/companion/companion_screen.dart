@@ -69,7 +69,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
     return FutureBuilder<bool>(
       key: ValueKey(refresh),
       future: ai
-          .isModelDownloaded()
+          .hasUsableModel()
           .timeout(const Duration(seconds: 3), onTimeout: () => false),
       builder: (context, model) {
         if (model.connectionState != ConnectionState.done) {

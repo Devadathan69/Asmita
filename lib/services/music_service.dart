@@ -22,42 +22,30 @@ class MusicService {
   final _tracks = <CyclePhase, List<TrackInfo>>{
     CyclePhase.menstruation: const [
       TrackInfo(
-        title: 'Calm 1',
-        asset: 'assets/audio/menstruation/calm_1.mp3',
+        title: 'Gentle Relief',
+        asset: 'assets/audio/menstruation/music3.mpeg',
         phase: CyclePhase.menstruation,
       ),
       TrackInfo(
-        title: 'Calm 2',
-        asset: 'assets/audio/menstruation/calm_2.mp3',
-        phase: CyclePhase.menstruation,
-      ),
-      TrackInfo(
-        title: 'Calm 3',
-        asset: 'assets/audio/menstruation/calm_3.mp3',
+        title: 'Soft Rest',
+        asset: 'assets/audio/menstruation/music4.mpeg',
         phase: CyclePhase.menstruation,
       ),
     ],
     CyclePhase.follicular: const [
       TrackInfo(
-        title: 'Energetic 1',
-        asset: 'assets/audio/follicular/energetic_1.mp3',
+        title: 'Fresh Start',
+        asset: 'assets/audio/follicular/music1.mpeg',
+        phase: CyclePhase.follicular,
+      ),
+      TrackInfo(
+        title: 'Light Energy',
+        asset: 'assets/audio/follicular/music2.mpeg',
         phase: CyclePhase.follicular,
       ),
     ],
-    CyclePhase.ovulation: const [
-      TrackInfo(
-        title: 'Upbeat 1',
-        asset: 'assets/audio/ovulation/upbeat_1.mp3',
-        phase: CyclePhase.ovulation,
-      ),
-    ],
-    CyclePhase.luteal: const [
-      TrackInfo(
-        title: 'Gentle 1',
-        asset: 'assets/audio/luteal/gentle_1.mp3',
-        phase: CyclePhase.luteal,
-      ),
-    ],
+    CyclePhase.ovulation: const [],
+    CyclePhase.luteal: const [],
   };
   List<TrackInfo> _current = const [];
 
@@ -93,6 +81,7 @@ class MusicService {
   Future<void> pause() => _player.pause();
   Future<void> next() => _player.seekToNext();
   Future<void> previous() => _player.seekToPrevious();
+  Future<void> stop() => _player.stop();
   Future<void> setLoop(bool loop) =>
       _player.setLoopMode(loop ? LoopMode.one : LoopMode.off);
   Future<void> setVolume(double volume) =>

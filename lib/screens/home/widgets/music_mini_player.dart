@@ -15,7 +15,7 @@ class MusicMiniPlayer extends ConsumerWidget {
         children: [
           Expanded(child: Text(track.title)),
           IconButton(onPressed: service.pause, icon: const Icon(Icons.pause)),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.close)),
+          IconButton(onPressed: service.stop, icon: const Icon(Icons.close)),
         ],
       ),
     );

@@ -23,14 +23,24 @@ class MusicScreen extends ConsumerWidget {
               phase: phase,
               count: service.tracksFor(phase).length,
               onTap: () async {
+                final tracks = service.tracksFor(phase);
+                if (tracks.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${phase.label} music is not added yet.'),
+                    ),
+                  );
+                  return;
+                }
                 await service.loadPlaylist(phase);
                 await service.play();
-                if (context.mounted)
+                if (context.mounted) {
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     builder: (_) => const NowPlayingSheet(),
                   );
+                }
               },
             ),
         ],

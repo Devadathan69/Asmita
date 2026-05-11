@@ -42,8 +42,6 @@ D:/Android/
 assets/models/*.bin
 assets/models/*.task
 assets/models/*.litertlm
-assets/audio/**/*.mpeg
-assets/audio/**/*.mp3
 
 # Symbolication related
 app.*.symbols

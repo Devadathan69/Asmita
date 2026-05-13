@@ -16,12 +16,20 @@ class StoreResult {
     required this.lat,
     required this.lon,
     required this.distance,
+    this.locality = 'Kothamangalam, Kerala',
+    this.napkinsAvailable = true,
+    this.isApproximate = false,
+    this.note,
   });
   final String name;
   final String type;
   final double lat;
   final double lon;
   final double distance;
+  final String locality;
+  final bool napkinsAvailable;
+  final bool isApproximate;
+  final String? note;
 }
 
 class NapkinFinderScreen extends StatefulWidget {
@@ -34,6 +42,7 @@ class _NapkinFinderScreenState extends State<NapkinFinderScreen> {
   bool accepted = false;
   bool loading = false;
   String? error;
+  String? info;
   List<StoreResult> stores = const [];
 
   @override
@@ -89,6 +98,15 @@ class _NapkinFinderScreenState extends State<NapkinFinderScreen> {
           const PrivacyNoticeBanner(),
           const SizedBox(height: 12),
           if (loading) const Center(child: CircularProgressIndicator()),
+          if (info != null) ...[
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.location_city_rounded),
+                title: Text(info!),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (error != null) Text(error!),
           if (!loading && stores.isEmpty && error == null)
             const Text('No stores found nearby. Try expanding search.'),
@@ -110,10 +128,15 @@ class _NapkinFinderScreenState extends State<NapkinFinderScreen> {
     setState(() {
       loading = true;
       error = null;
+      info = null;
       stores = const [];
     });
     try {
       final location = await LocationService().currentRoundedLocation();
+      final localStores = _localKothamangalamStores(
+        userLat: location.latitude,
+        userLon: location.longitude,
+      );
       final query =
           '[out:json];(node["shop"="chemist"](around:2000,${location.latitude},${location.longitude});node["shop"="supermarket"](around:2000,${location.latitude},${location.longitude});node["amenity"="pharmacy"](around:2000,${location.latitude},${location.longitude}););out body;';
       final body = await const NetworkPrivacyService().query(
@@ -122,7 +145,7 @@ class _NapkinFinderScreenState extends State<NapkinFinderScreen> {
       );
       final json = jsonDecode(body) as Map<String, dynamic>;
       final elements = (json['elements'] as List? ?? const []);
-      stores = elements.map((e) {
+      final osmStores = elements.map((e) {
         final tags = (e['tags'] as Map?) ?? {};
         final lat = (e['lat'] as num).toDouble();
         final lon = (e['lon'] as num).toDouble();
@@ -134,17 +157,75 @@ class _NapkinFinderScreenState extends State<NapkinFinderScreen> {
           lat: lat,
           lon: lon,
           distance: _distance(location.latitude, location.longitude, lat, lon),
+          locality: 'Nearby',
+          napkinsAvailable: false,
         );
-      }).toList()
+      }).toList();
+      stores = [...localStores, ...osmStores]
         ..sort((a, b) => a.distance.compareTo(b.distance));
     } on LocationPermissionDeniedException {
+      stores = _localKothamangalamStores();
+      info = 'Stores in Kothamangalam';
       error =
-          'Location permission denied. You can search nearby pharmacies or supermarkets in your maps app.';
+          'Location permission denied. Showing verified local stores without using your location.';
     } catch (_) {
-      error = 'No connection. Try again when connected.';
+      stores = _localKothamangalamStores();
+      info = 'Stores in Kothamangalam';
+      error = 'No connection. Showing verified local stores saved in the app.';
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  List<StoreResult> _localKothamangalamStores({
+    double? userLat,
+    double? userLon,
+  }) {
+    const fallbackLat = 10.0649;
+    const fallbackLon = 76.6283;
+    final originLat = userLat ?? fallbackLat;
+    final originLon = userLon ?? fallbackLon;
+    const note =
+        'Approximate location - please confirm in maps or with the store before visiting.';
+    final stores = [
+      (
+        name: 'Jas Medicals',
+        type: 'Medical store',
+        lat: 10.0649,
+        lon: 76.6283,
+      ),
+      (
+        name: 'Smitha Medicals',
+        type: 'Medical store',
+        lat: 10.0660,
+        lon: 76.6292,
+      ),
+      (
+        name: 'Easy Bazar',
+        type: 'Store',
+        lat: 10.0638,
+        lon: 76.6274,
+      ),
+      (
+        name: 'Samrudhi Store',
+        type: 'Store',
+        lat: 10.0656,
+        lon: 76.6267,
+      ),
+    ];
+    return stores.map((store) {
+      return StoreResult(
+        name: store.name,
+        type: store.type,
+        lat: store.lat,
+        lon: store.lon,
+        distance: _distance(originLat, originLon, store.lat, store.lon),
+        locality: 'Kothamangalam, Kerala',
+        napkinsAvailable: true,
+        isApproximate: true,
+        note: note,
+      );
+    }).toList();
   }
 
   double _distance(double lat1, double lon1, double lat2, double lon2) {

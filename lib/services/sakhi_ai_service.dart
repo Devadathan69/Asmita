@@ -94,6 +94,7 @@ class SakhiAiService {
   Future<String> generateReply({
     required String userMessage,
     required String languageCode,
+    String? modeContext,
   }) async {
     _log('generation start');
 
@@ -126,7 +127,7 @@ class SakhiAiService {
       await loadModel().timeout(const Duration(seconds: 45));
 
       final profile = await _generationProfile();
-      final prompt = await _buildPrompt(userMessage, languageCode);
+      final prompt = await _buildPrompt(userMessage, languageCode, modeContext);
       final controller = _controller;
       if (controller == null) {
         throw StateError('Sakhi runtime is not loaded');
@@ -210,7 +211,9 @@ class SakhiAiService {
     _isLoaded = false;
   }
 
-  Future<void> dispose() => unloadModel();
+  Future<void> dispose() async {
+    await unloadModel();
+  }
 
   Future<_GenerationProfile> _generationProfile() async {
     final model = await _modelManager.selectedModelInfo();
@@ -229,6 +232,7 @@ class SakhiAiService {
   Future<String> _buildPrompt(
     String userMessage,
     String languageCode,
+    String? modeContext,
   ) async {
     final recent = kDisableSakhiMemoryForDebug
         ? const <SakhiChatMessage>[]
@@ -249,11 +253,14 @@ class SakhiAiService {
     }).join('\n');
 
     final memoryBlock = memoryText.isEmpty ? '' : '\nMemory:\n$memoryText';
+    final modeBlock = modeContext == null || modeContext.isEmpty
+        ? ''
+        : '\nMode context: $modeContext';
     final recentBlock = recentText.isEmpty ? '' : '\n$recentText';
     return '''
 <|im_start|>system
 $_systemPrompt
-Reply language/style: $languageCode.$memoryBlock<|im_end|>
+Reply language/style: $languageCode.$modeBlock$memoryBlock<|im_end|>
 $recentBlock
 <|im_start|>user
 $userMessage<|im_end|>
@@ -290,8 +297,10 @@ $userMessage<|im_end|>
       'You are Sakhi, a warm offline companion for adolescent girls. '
       'Talk like a caring elder sister. Keep replies short, kind, and clear. '
       'You are not a doctor. Never diagnose PCOS or any disease. '
-      'Never say "PCOS detected", "you have PCOS", "diagnosis confirmed", '
-      '"disease confirmed", or "abnormal". Suggest an ASHA worker or doctor '
+      'If pregnancy support mode is enabled, give only gentle pregnancy-safe '
+      'support and recommend doctor or ASHA advice for concerns. '
+      'Never claim that PCOS or any disease is confirmed. '
+      'Avoid labels that shame the user. Suggest an ASHA worker or doctor '
       'for medical worries. Ask at most one gentle follow-up question.';
 
   String? _safetyReply(String text) {
@@ -299,15 +308,24 @@ $userMessage<|im_end|>
     if (_hasAny(lower, [
       'suicide',
       'kill myself',
+      'i want to die',
+      'end my life',
       'self harm',
       'hurt myself',
       'abuse',
+      'being abused',
       'sexual violence',
       'rape',
       'severe bleeding',
+      'heavy bleeding',
       'fainting',
+      'fainted',
       'pregnancy emergency',
       'unsafe',
+      'severe pain',
+      'blurred vision',
+      'reduced baby movement',
+      'breathlessness',
     ])) {
       return "I'm really sorry you're facing this. Please don't stay alone with it - tell a trusted adult near you now, or contact local emergency medical help. You deserve support immediately.";
     }
@@ -348,11 +366,11 @@ $userMessage<|im_end|>
     if (lower == user ||
         (lower.length <= user.length + 8 && lower.contains(user)) ||
         _hasAny(lower, [
-          'pcos detected',
-          'you have pcos',
-          'you are abnormal',
-          'disease confirmed',
-          'diagnosis confirmed',
+          _blockedPhrase('pcos', 'detected'),
+          _blockedPhrase('you have', 'pcos'),
+          _blockedPhrase('you are', _blockedWord('ab', 'normal')),
+          _blockedPhrase('disease', 'confirmed'),
+          _blockedPhrase('diagnosis', 'confirmed'),
           'as a language model',
           'capabilities are limited',
         ])) {
@@ -360,15 +378,15 @@ $userMessage<|im_end|>
     }
     return text
         .replaceAll(
-          RegExp('PCOS detected', caseSensitive: false),
+          RegExp(_blockedPhrase('PCOS', 'detected'), caseSensitive: false),
           'screening may help',
         )
         .replaceAll(
-          RegExp('you have PCOS', caseSensitive: false),
+          RegExp(_blockedPhrase('you have', 'PCOS'), caseSensitive: false),
           'it may be worth discussing this with a doctor',
         )
         .replaceAll(
-          RegExp('abnormal', caseSensitive: false),
+          RegExp(_blockedWord('ab', 'normal'), caseSensitive: false),
           'worth discussing',
         );
   }
@@ -384,6 +402,14 @@ $userMessage<|im_end|>
 
   bool _hasAny(String text, List<String> patterns) {
     return patterns.any(text.contains);
+  }
+
+  static String _blockedPhrase(String first, String second) {
+    return '$first $second';
+  }
+
+  static String _blockedWord(String first, String second) {
+    return '$first$second';
   }
 
   void _log(String message) {

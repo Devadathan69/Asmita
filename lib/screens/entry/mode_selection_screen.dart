@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../config/build_config.dart';
 import '../../l10n/strings.dart';
 import '../../providers/language_provider.dart';
 import '../../theme/app_colors.dart';
@@ -58,14 +59,16 @@ class ModeSelectionScreen extends ConsumerWidget {
                       color: AppColors.secondary,
                       onTap: () => context.go('/onboarding'),
                     ),
-                    const SizedBox(height: 16),
-                    _ModeCard(
-                      icon: Icons.health_and_safety_rounded,
-                      title: t('asha_mode'),
-                      subtitle: t('asha_worker_subtitle'),
-                      color: AppColors.primary,
-                      onTap: () => context.go('/asha-coming-soon'),
-                    ),
+                    if (BuildConfig.showAshaMode) ...[
+                      const SizedBox(height: 16),
+                      _ModeCard(
+                        icon: Icons.health_and_safety_rounded,
+                        title: t('asha_mode'),
+                        subtitle: t('asha_worker_subtitle'),
+                        color: AppColors.primary,
+                        onTap: () => context.go('/asha-coming-soon'),
+                      ),
+                    ],
                     const SizedBox(height: 30),
                     Text(
                       t('select_language'),

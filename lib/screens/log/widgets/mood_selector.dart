@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 
 class MoodSelector extends StatelessWidget {
-  const MoodSelector({super.key, required this.value, required this.onChanged});
+  const MoodSelector({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.options = moods,
+  });
   final String? value;
   final ValueChanged<String> onChanged;
+  final List<(String, IconData, Color)> options;
 
   static const moods = [
     ('Calm', Icons.spa_rounded, AppColors.success),
@@ -27,7 +33,7 @@ class MoodSelector extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final mood in moods)
+              for (final mood in options)
                 ChoiceChip(
                   avatar: Icon(mood.$2, color: mood.$3, size: 18),
                   label: Text(mood.$1),

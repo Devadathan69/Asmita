@@ -4,11 +4,9 @@ class CompanionInputBar extends StatefulWidget {
   const CompanionInputBar({
     super.key,
     required this.onSend,
-    required this.onMic,
     this.enabled = true,
   });
   final ValueChanged<String> onSend;
-  final VoidCallback onMic;
   final bool enabled;
   @override
   State<CompanionInputBar> createState() => _CompanionInputBarState();
@@ -29,9 +27,6 @@ class _CompanionInputBarState extends State<CompanionInputBar> {
           padding: const EdgeInsets.all(8),
           child: Row(
             children: [
-              IconButton(
-                  onPressed: widget.enabled ? widget.onMic : null,
-                  icon: const Icon(Icons.mic_none)),
               Expanded(
                 child: TextField(
                   controller: controller,

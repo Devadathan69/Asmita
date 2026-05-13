@@ -5,9 +5,11 @@ class SymptomChips extends StatelessWidget {
     super.key,
     required this.selected,
     required this.onChanged,
+    this.options = symptoms,
   });
   final Set<String> selected;
   final VoidCallback onChanged;
+  final List<String> options;
   static const symptoms = [
     'Cramps',
     'Bloating',
@@ -20,7 +22,8 @@ class SymptomChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Wrap(
         spacing: 8,
-        children: symptoms
+        runSpacing: 8,
+        children: options
             .map(
               (s) => FilterChip(
                 label: Text(s),

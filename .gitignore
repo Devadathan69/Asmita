@@ -1,60 +1,106 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Dart / Flutter
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
-.dart_appdata/
-.design_ref/
+build/
+coverage/
+*.lock
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/app/build/
+android/build/
+android/local.properties
+android/key.properties
+android/*.jks
+android/*.keystore
+*.jks
+*.keystore
 .gradle-home/
 .java-tmp/
 D:/Android/
 
-# Large local-only model/audio drops
-assets/models/*.bin
-assets/models/*.task
-assets/models/*.litertlm
+# iOS / macOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+macos/Pods/
 
-# Symbolication related
+# Secrets / env
+.env
+*.env
+.env.*
+!.env.example
+local.properties
+key.properties
+secrets.json
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Models and large local-only assets
+*.tflite
+*.lite
+*.task
+*.gguf
+*.bin
+*.onnx
+*.pt
+*.pth
+*.h5
+models/
+assets/models/
+!assets/models/
+!assets/models/.gitkeep
+assets/audio/
+!assets/audio/
+!assets/audio/.gitkeep
+downloads/
+*.mp3
+*.mpeg
+*.wav
+*.m4a
+
+# Generated / temp
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_appdata/
+.design_ref/
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
 
-# Local SDK path and build state
-android/local.properties
-android/.gradle/
-android/.kotlin/
+# Screenshots / recordings / demo exports
+screenshots/
+recordings/
+demo/
+*.mp4
+*.mov
+*.webm
+
+# Python / backend
+__pycache__/
+*.pyc
+venv/
+.venv/
+migrate_working_dir/

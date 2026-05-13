@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../db/database_helper.dart';
 import '../l10n/strings.dart';
 
 final languageProvider =
@@ -11,7 +12,8 @@ class LanguageNotifier extends AsyncNotifier<AppLanguage> {
   @override
   Future<AppLanguage> build() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_key);
+    final profile = await DatabaseHelper.instance.getProfile();
+    final saved = profile?.language ?? prefs.getString(_key);
     return AppLanguage.values.firstWhere(
       (language) => language.name == saved,
       orElse: () => AppLanguage.english,

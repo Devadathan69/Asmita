@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../l10n/strings.dart';
+import '../../providers/language_provider.dart';
+import '../../providers/personal_tracking_mode_provider.dart';
 import '../../theme/app_colors.dart';
 
-class AsmitaBottomNav extends StatelessWidget {
+class AsmitaBottomNav extends ConsumerWidget {
   const AsmitaBottomNav({super.key, required this.child});
   final Widget child;
 
@@ -16,17 +20,25 @@ class AsmitaBottomNav extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
     final index = routes
         .indexWhere((r) => location.startsWith(r))
         .clamp(0, routes.length - 1);
-    final items = const [
-      _NavItem(Icons.home_rounded, 'Home'),
-      _NavItem(Icons.calendar_month_rounded, 'Calendar'),
-      _NavItem(Icons.add_chart_rounded, 'Log'),
-      _NavItem(Icons.auto_awesome_rounded, 'Sakhi'),
-      _NavItem(Icons.person_rounded, 'More'),
+    final language = ref.watch(languageProvider).value ?? AppLanguage.english;
+    final mode = ref.watch(personalTrackingModeProvider);
+    String t(String key) => Strings.t(key, language);
+    final items = [
+      _NavItem(Icons.home_rounded, t('home')),
+      _NavItem(Icons.calendar_month_rounded, t('calendar')),
+      _NavItem(Icons.add_chart_rounded, t('log')),
+      _NavItem(
+        mode == PersonalTrackingMode.pregnancy
+            ? Icons.favorite_rounded
+            : Icons.auto_awesome_rounded,
+        mode == PersonalTrackingMode.pregnancy ? t('care') : t('companion'),
+      ),
+      _NavItem(Icons.person_rounded, t('more')),
     ];
     return Scaffold(
       extendBody: true,

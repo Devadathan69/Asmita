@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/strings.dart';
 import '../../providers/ai_companion_provider.dart';
@@ -60,6 +59,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
     final ai = ref.watch(aiServiceProvider);
     final language = ref.watch(languageProvider).value ?? AppLanguage.english;
     final isGenerating = ref.watch(sakhiGeneratingProvider);
+    String t(String key) => Strings.t(key, language);
     _syncStuckRecovery(isGenerating);
     return FutureBuilder<bool>(
       key: ValueKey(refresh),
@@ -97,7 +97,7 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
                     child: AsmitaScreenHeader(
                       title: 'Sakhi',
-                      subtitle: 'Private companion - No data sent',
+                      subtitle: t('offline_ai_companion'),
                       trailing: PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert_rounded),
                         onSelected: (value) {
@@ -119,11 +119,11 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                       ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: PrivacyBadge(label: 'Running on your device'),
+                      child: PrivacyBadge(label: t('works_offline')),
                     ),
                   ),
                   Expanded(
@@ -151,7 +151,6 @@ class _CompanionScreenState extends ConsumerState<CompanionScreen> {
                             );
                       }
                     },
-                    onMic: () => HapticFeedback.selectionClick(),
                   ),
                   if (_showStuckRecovery && isGenerating)
                     Padding(

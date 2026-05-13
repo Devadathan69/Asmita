@@ -19,6 +19,7 @@ class CycleCalendar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).accessibleNavigation;
     final now = DateTime.now();
     final first = DateTime(now.year, now.month);
     final days = DateTime(now.year, now.month + 1, 0).day;
@@ -84,7 +85,7 @@ class CycleCalendar extends StatelessWidget {
               final isToday = date.year == now.year &&
                   date.month == now.month &&
                   date.day == now.day;
-              return _DayTile(
+              final tile = _DayTile(
                 day: day,
                 info: info,
                 isToday: isToday,
@@ -95,10 +96,11 @@ class CycleCalendar extends StatelessWidget {
                   backgroundColor: Theme.of(context).colorScheme.surface,
                   builder: (_) => DayDetailSheet(date: date, info: info),
                 ),
-              ).animate(delay: (day * 16).ms).fadeIn().scale(
-                    begin: const Offset(.92, .92),
-                    duration: 260.ms,
-                    curve: Curves.easeOutBack,
+              );
+              if (reduceMotion) return tile;
+              return tile.animate(delay: (day * 6).ms).fadeIn(
+                    duration: 180.ms,
+                    curve: Curves.easeOutCubic,
                   );
             },
           ),

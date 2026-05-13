@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../l10n/strings.dart';
 import '../../providers/cycle_provider.dart';
+import '../../providers/language_provider.dart';
+import '../../providers/log_provider.dart';
+import '../../providers/personal_tracking_mode_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/cycle_calculator.dart';
@@ -9,6 +13,7 @@ import '../../widgets/common/asmita_screen_header.dart';
 import '../../widgets/common/gradient_background.dart';
 import 'widgets/cycle_calendar.dart';
 import 'widgets/day_detail_sheet.dart';
+import 'widgets/pregnancy_calendar.dart';
 
 class CalendarScreen extends ConsumerWidget {
   const CalendarScreen({super.key});
@@ -16,6 +21,22 @@ class CalendarScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider).value;
+    final mode = ref.watch(personalTrackingModeProvider);
+    final language = ref.watch(languageProvider).value ?? AppLanguage.english;
+    final logs = ref.watch(logProvider).value ?? const [];
+    if (mode == PersonalTrackingMode.pregnancy && profile != null) {
+      return Scaffold(
+        body: GradientBackground(
+          child: SafeArea(
+            child: PregnancyCalendar(
+              profile: profile,
+              logs: logs,
+              language: language,
+            ),
+          ),
+        ),
+      );
+    }
     final cycles = ref.watch(cycleProvider).value ?? const [];
     final lastStart = cycles.isEmpty ? DateTime.now() : cycles.last.startDate;
     final todayInfo = CycleCalculator.infoFor(

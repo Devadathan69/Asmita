@@ -20,10 +20,10 @@ class DatabaseHelper {
     final path = p.join(await getDatabasesPath(), 'asmita.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute(
-          'CREATE TABLE user_profile(id INTEGER PRIMARY KEY, name_enc TEXT, date_of_birth TEXT, avg_cycle_length INTEGER DEFAULT 28, period_duration INTEGER DEFAULT 5, is_irregular INTEGER DEFAULT 0, life_stage TEXT DEFAULT "menstruating", suspects_pcos TEXT DEFAULT "not_sure", language TEXT DEFAULT "english", discreet_mode INTEGER DEFAULT 0, created_at TEXT)',
+          'CREATE TABLE user_profile(id INTEGER PRIMARY KEY, name_enc TEXT, date_of_birth TEXT, height_cm_enc TEXT, weight_kg_enc TEXT, avg_cycle_length INTEGER DEFAULT 28, period_duration INTEGER DEFAULT 5, is_irregular INTEGER DEFAULT 0, life_stage TEXT DEFAULT "menstruating", suspects_pcos TEXT DEFAULT "not_sure", language TEXT DEFAULT "english", discreet_mode INTEGER DEFAULT 0, is_pregnant INTEGER DEFAULT 0, pregnancy_status_enc TEXT, pregnancy_lmp_enc TEXT, estimated_due_date_enc TEXT, high_risk_pregnancy INTEGER DEFAULT 0, high_risk_pregnancy_enc TEXT, created_at TEXT)',
         );
         await db.execute(
           'CREATE TABLE cycle_entries(id INTEGER PRIMARY KEY, start_date TEXT NOT NULL, end_date TEXT, cycle_length INTEGER, period_length INTEGER, notes_enc TEXT, created_at TEXT)',
@@ -51,8 +51,65 @@ class DatabaseHelper {
         if (oldVersion < 3) {
           await _createSakhiTables(db);
         }
+        if (oldVersion < 4) {
+          await _migrateProfileHealthDetails(db);
+        }
       },
     );
+  }
+
+  Future<void> _migrateProfileHealthDetails(Database db) async {
+    await _addColumnIfMissing(db, 'user_profile', 'height_cm_enc', 'TEXT');
+    await _addColumnIfMissing(db, 'user_profile', 'weight_kg_enc', 'TEXT');
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'is_pregnant',
+      'INTEGER DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'pregnancy_status_enc',
+      'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'pregnancy_lmp_enc',
+      'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'estimated_due_date_enc',
+      'TEXT',
+    );
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'high_risk_pregnancy',
+      'INTEGER DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'user_profile',
+      'high_risk_pregnancy_enc',
+      'TEXT',
+    );
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = columns.any((row) => row['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    }
   }
 
   Future<void> _createScreeningRecords(Database db) async {
@@ -134,6 +191,8 @@ class DatabaseHelper {
       id: r['id'] as int?,
       name: await _dec(r['name_enc']),
       dateOfBirth: await _dec(r['date_of_birth']),
+      heightCm: double.tryParse(await _dec(r['height_cm_enc']) ?? ''),
+      weightKg: double.tryParse(await _dec(r['weight_kg_enc']) ?? ''),
       avgCycleLength: r['avg_cycle_length'] as int? ?? 28,
       periodDuration: r['period_duration'] as int? ?? 5,
       isIrregular: (r['is_irregular'] as int? ?? 0) == 1,
@@ -141,6 +200,12 @@ class DatabaseHelper {
       suspectsCyclePatternConcerns: r['suspects_pcos'] as String? ?? 'not_sure',
       language: r['language'] as String? ?? 'english',
       discreetMode: (r['discreet_mode'] as int? ?? 0) == 1,
+      isPregnant: (await _dec(r['pregnancy_status_enc'])) == 'true' ||
+          (r['is_pregnant'] as int? ?? 0) == 1,
+      lastMenstrualPeriodForPregnancy: await _dec(r['pregnancy_lmp_enc']),
+      estimatedDueDate: await _dec(r['estimated_due_date_enc']),
+      highRiskPregnancy: (await _dec(r['high_risk_pregnancy_enc'])) == 'true' ||
+          (r['high_risk_pregnancy'] as int? ?? 0) == 1,
       createdAt:
           DateTime.tryParse(r['created_at'] as String? ?? '') ?? DateTime.now(),
     );
@@ -152,6 +217,8 @@ class DatabaseHelper {
       'id': profile.id ?? 1,
       'name_enc': await _enc(profile.name),
       'date_of_birth': await _enc(profile.dateOfBirth),
+      'height_cm_enc': await _enc(profile.heightCm?.toStringAsFixed(1)),
+      'weight_kg_enc': await _enc(profile.weightKg?.toStringAsFixed(1)),
       'avg_cycle_length': profile.avgCycleLength,
       'period_duration': profile.periodDuration,
       'is_irregular': profile.isIrregular ? 1 : 0,
@@ -159,6 +226,14 @@ class DatabaseHelper {
       'suspects_pcos': profile.suspectsCyclePatternConcerns,
       'language': profile.language,
       'discreet_mode': profile.discreetMode ? 1 : 0,
+      'is_pregnant': profile.isPregnant && profile.canUsePregnancyMode ? 1 : 0,
+      'pregnancy_status_enc': await _enc(
+          (profile.isPregnant && profile.canUsePregnancyMode).toString()),
+      'pregnancy_lmp_enc': await _enc(profile.lastMenstrualPeriodForPregnancy),
+      'estimated_due_date_enc': await _enc(profile.estimatedDueDate),
+      'high_risk_pregnancy': profile.highRiskPregnancy ? 1 : 0,
+      'high_risk_pregnancy_enc':
+          await _enc(profile.highRiskPregnancy.toString()),
       'created_at': DateTime.now().toIso8601String(),
     };
     await db.insert(

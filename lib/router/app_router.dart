@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../config/build_config.dart';
 import '../screens/asha/asha_camera_screen.dart';
 import '../screens/asha/asha_history_screen.dart';
 import '../screens/asha/asha_home_screen.dart';
@@ -24,6 +25,13 @@ import '../widgets/common/asmita_bottom_nav.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
+  redirect: (context, state) {
+    final path = state.uri.path;
+    if (!BuildConfig.showAshaMode && path.startsWith('/asha')) {
+      return '/home';
+    }
+    return null;
+  },
   routes: [
     GoRoute(
       path: '/',

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db/models/chat_message.dart';
 import '../services/sakhi_ai_service.dart';
 import '../services/sakhi_memory_service.dart';
+import 'user_profile_provider.dart';
 
 final sakhiAiServiceProvider = Provider<SakhiAiService>((ref) {
   final service = SakhiAiService();
@@ -80,6 +81,7 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
           .generateReply(
             userMessage: trimmed,
             languageCode: language,
+            modeContext: _modeContext(),
           )
           .timeout(const Duration(seconds: 90));
       if (generationId != _generationSerial) return;
@@ -160,5 +162,13 @@ class ChatNotifier extends AsyncNotifier<List<ChatMessage>> {
         sessionId: 'sakhi_local_memory',
       ),
     ]);
+  }
+
+  String _modeContext() {
+    final profile = ref.read(userProfileProvider).value;
+    if (profile?.isPregnant == true) {
+      return 'User has enabled pregnancy support mode. Do not diagnose. Give gentle pregnancy-safe support and recommend doctor or ASHA guidance for concerns.';
+    }
+    return 'User is using personal cycle tracking mode.';
   }
 }
